@@ -1,5 +1,5 @@
 {
-  description = "flare — CLI agents (claude-code, codex, antigravity-cli, pi-coding-agent) packaged individually, each pinned to its own nixpkgs revision so they can be updated one at a time.";
+  description = "airi — CLI agents (claude-code, codex, antigravity-cli, pi-coding-agent) packaged individually, each pinned to its own nixpkgs revision so they can be updated one at a time.";
 
   inputs = {
     # Base nixpkgs, used only for `lib` helpers (genAttrs, etc). Doesn't need
@@ -65,7 +65,7 @@
 
           # Install all four at once if you want.
           default = pkgs.symlinkJoin {
-            name = "flare-tools";
+            name = "airi-tools";
             paths = [
               claude-code
               codex

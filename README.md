@@ -1,4 +1,4 @@
-# flare
+# airi
 
 Flake packaging four AI coding CLIs — `claude-code`, `codex`, `antigravity-cli`,
 `pi-coding-agent` — each pinned to its own `nixpkgs` input, so each can be
@@ -59,17 +59,17 @@ nix flake update
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flare.url = "path:/home/giks/projects/flare"; # or github:you/flare
+    airi.url = "path:/home/giks/projects/airi"; # or github:you/airi
   };
 
-  outputs = { nixpkgs, flare, ... }: {
+  outputs = { nixpkgs, airi, ... }: {
     nixosConfigurations.host = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       modules = [
         ({ pkgs, ... }: {
           environment.systemPackages = [
-            flare.packages.${pkgs.system}.claude-code
-            flare.packages.${pkgs.system}.codex
+            airi.packages.${pkgs.system}.claude-code
+            airi.packages.${pkgs.system}.codex
           ];
         })
       ];
@@ -78,10 +78,10 @@ nix flake update
 }
 ```
 
-Then update `flare` in the system flake and rebuild:
+Then update `airi` in the system flake and rebuild:
 
 ```sh
-nix flake lock --update-input flare
+nix flake lock --update-input airi
 sudo nixos-rebuild switch --flake .#host
 ```
 

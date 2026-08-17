@@ -1,6 +1,7 @@
 { pkgs }:
 let
-  inherit (import ./versions.nix) version hash;
+  version = "1.1.13"; # nix-update: version
+  hash = "sha256-7cfDK1q0/C5NoDOB/ug+1WbeprVrVvkynNE813lHodk="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "antigravity-cli";

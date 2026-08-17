@@ -1,6 +1,7 @@
 { pkgs }:
 let
-  inherit (import ./versions.nix) version hash;
+  version = "0.84.2"; # nix-update: version
+  hash = "sha256-kG++eH/SJcSsYk/n69Wx1Vpg4PXH71F5XSMVZPnuHBM="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "pi-coding-agent";
@@ -20,7 +21,7 @@ pkgs.stdenv.mkDerivation {
   buildInputs = [ pkgs.stdenv.cc.cc.lib ];
 
   # Bun-compiled standalone executable — see the comment in
-  # packages/claude-code/default.nix for why stripping breaks it.
+  # packages/claude-code.nix for why stripping breaks it.
   dontStrip = true;
 
   sourceRoot = "pi";

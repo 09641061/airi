@@ -14,16 +14,16 @@
         config.allowUnfree = true; # claude-code / antigravity-cli / pi are closed-source
       };
 
-      claude-code = import ./packages/claude-code { inherit pkgs; };
-      codex = import ./packages/codex { inherit pkgs; };
-      antigravity-cli = import ./packages/antigravity-cli { inherit pkgs; };
-      pi-coding-agent = import ./packages/pi-coding-agent { inherit pkgs; };
+      claude-code = import ./packages/claude-code.nix { inherit pkgs; };
+      codex = import ./packages/codex.nix { inherit pkgs; };
+      antigravity-cli = import ./packages/antigravity-cli.nix { inherit pkgs; };
+      pi-coding-agent = import ./packages/pi-coding-agent.nix { inherit pkgs; };
 
       mkUpdateApp = name: {
         type = "app";
         program = toString (
           pkgs.writeShellScript "update-${name}" ''
-            exec bash ${self}/packages/${name}/update.sh "$@"
+            exec bash ${self}/scripts/update-${name}.sh "$@"
           ''
         );
       };
@@ -50,7 +50,7 @@
       };
 
       # Per-tool updaters: pull the latest official release, recompute the
-      # hash, and rewrite packages/<tool>/versions.nix.
+      # hash, and rewrite the version/hash lines in packages/<tool>.nix.
       #   nix run .#update-claude-code
       #   nix run .#update-codex
       #   nix run .#update-pi-coding-agent

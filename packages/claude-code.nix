@@ -1,6 +1,7 @@
 { pkgs }:
 let
-  inherit (import ./versions.nix) version hash;
+  version = "2.1.234"; # nix-update: version
+  hash = "sha256-NHNgHqaV1b92nFsgKETUy0+/cjrplUUPy2lzIEd1yEo="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "claude-code";

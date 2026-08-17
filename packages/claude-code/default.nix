@@ -1,0 +1,2 @@
+{ pkgs }:
+pkgs.claude-code

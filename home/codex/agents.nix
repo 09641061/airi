@@ -1,7 +1,7 @@
 { lib, ... }:
 
 let
-  agents = [ "architect" "developer" "explorer" "researcher" "reviewer" "tester" ];
+  agents = [ "architect" "coordinator" "designer" "developer" "explorer" "researcher" "reviewer" "tester" ];
 
   findClosingFrontmatter = lines:
     if lines == [ ] then

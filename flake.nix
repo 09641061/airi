@@ -3,10 +3,11 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    pi.url = "github:lukasl-dev/pi.nix";
   };
 
   outputs =
-    { self, nixpkgs, ... }:
+    { self, nixpkgs, pi, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -14,16 +15,21 @@
         config.allowUnfree = true; # claude-code / antigravity-cli / pi are closed-source
       };
 
-      claude-code = import ./packages/claude-code.nix { inherit pkgs; };
-      codex = import ./packages/codex.nix { inherit pkgs; };
-      antigravity-cli = import ./packages/antigravity-cli.nix { inherit pkgs; };
-      pi-coding-agent = import ./packages/pi-coding-agent.nix { inherit pkgs; };
+      claude-code = import ./packages/claude { inherit pkgs; };
+      codex = import ./packages/codex { inherit pkgs; };
+      antigravity-cli = import ./packages/agy { inherit pkgs; };
+      pi-coding-agent = import ./packages/pi { inherit pkgs; };
 
       mkUpdateApp = name: {
         type = "app";
         program = toString (
           pkgs.writeShellScript "update-${name}" ''
-            exec bash ${self}/scripts/update-${name}.sh "$@"
+            exec bash ${
+              if name == "claude-code" then "${self}/packages/claude/update-claude-code.sh"
+              else if name == "codex" then "${self}/packages/codex/update-codex.sh"
+              else if name == "pi-coding-agent" then "${self}/packages/pi/update-pi-coding-agent.sh"
+              else "${self}/packages/agy/update-antigravity-cli.sh"
+            } "$@"
           ''
         );
       };
@@ -48,6 +54,9 @@
           ];
         };
       };
+
+      homeModules.ai = { ... }@args:
+        import ./home-module.nix (args // { inherit pi; });
 
       # Per-tool updaters: pull the latest official release, recompute the
       # hash, and rewrite the version/hash lines in packages/<tool>.nix.

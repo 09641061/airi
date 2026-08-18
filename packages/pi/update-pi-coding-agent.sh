@@ -2,7 +2,7 @@
 # Asks GitHub for the latest pi release tag, re-downloads the linux asset
 # to compute its hash, and rewrites ../packages/pi-coding-agent.nix.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../packages"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 tag=$(gh release view --repo earendil-works/pi --json tagName -q .tagName)
 version=${tag#v}
@@ -15,5 +15,5 @@ hash=$(nix hash convert --hash-algo sha256 --to sri "$base32")
 sed -i \
   -e "s|version = \".*\"; # nix-update: version|version = \"${version}\"; # nix-update: version|" \
   -e "s|hash = \".*\"; # nix-update: hash|hash = \"${hash}\"; # nix-update: hash|" \
-  pi-coding-agent.nix
+  default.nix
 echo "updated pi-coding-agent.nix -> ${tag}"

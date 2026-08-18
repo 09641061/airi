@@ -12,10 +12,10 @@ input per tool.
 ```
 flake.nix
 packages/
-  claude-code/default.nix
+  claude/default.nix
   codex/default.nix
-  antigravity-cli/default.nix
-  pi-coding-agent/default.nix
+  agy/default.nix
+  pi/default.nix
 ```
 
 ## Tools

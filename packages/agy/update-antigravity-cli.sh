@@ -3,7 +3,7 @@
 # linux asset to compute its hash, and rewrites
 # ../packages/antigravity-cli.nix in place.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../packages"
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
 version=$(gh release view --repo google-antigravity/antigravity-cli --json tagName -q .tagName)
 url="https://github.com/google-antigravity/antigravity-cli/releases/download/${version}/agy_cli_linux_x64.tar.gz"
@@ -15,5 +15,5 @@ hash=$(nix hash convert --hash-algo sha256 --to sri "$base32")
 sed -i \
   -e "s|version = \".*\"; # nix-update: version|version = \"${version}\"; # nix-update: version|" \
   -e "s|hash = \".*\"; # nix-update: hash|hash = \"${hash}\"; # nix-update: hash|" \
-  antigravity-cli.nix
+  default.nix
 echo "updated antigravity-cli.nix -> ${version}"

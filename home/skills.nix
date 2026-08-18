@@ -15,8 +15,8 @@ let
     { path = "software-engineering/domain-driven-design-ddd/flutter"; }
     { path = "software-engineering/domain-driven-design-ddd/java-25"; }
     { path = "software-engineering/domain-driven-design-ddd/next"; flatName = "ddd-next"; }
-    { path = "software-engineering/test-driven-development-tdb/java"; }
-    { path = "software-engineering/test-driven-development-tdb/next"; flatName = "tdd-next"; }
+    { path = "software-engineering/test-driven-development-tdb/java-tdb"; flatName = "java"; }
+    { path = "software-engineering/test-driven-development-tdb/next-tdb"; flatName = "tdd-next"; }
     { path = "software-testing-qa/testing-by-method/mutation"; flatName = "mutation-testing"; }
   ];
 

@@ -1,6 +1,7 @@
 ---
 name: developer
 description: Implements code changes according to the given requirement or plan
+tools: "*"
 ---
 
 # Role

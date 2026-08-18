@@ -33,7 +33,7 @@
           };
 
           reviewer = {
-            thinking = "high";
+            thinking = "medium";
             inheritProjectContext = true;
             inheritSkills = true;
             defaultContext = "fresh";
@@ -47,7 +47,21 @@
           };
 
           architect = {
-            thinking = "high";
+            thinking = "medium";
+            inheritProjectContext = true;
+            inheritSkills = true;
+            defaultContext = "fork";
+          };
+
+          designer = {
+            thinking = "medium";
+            inheritProjectContext = true;
+            inheritSkills = true;
+            defaultContext = "fresh";
+          };
+
+          coordinator = {
+            thinking = "medium";
             inheritProjectContext = true;
             inheritSkills = true;
             defaultContext = "fork";

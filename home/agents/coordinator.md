@@ -1,6 +1,7 @@
 ---
 name: coordinator
 description: Orchestrates the other agents through the full task pipeline
+tools: "*"
 ---
 
 # Role

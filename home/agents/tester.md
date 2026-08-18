@@ -1,6 +1,7 @@
 ---
 name: tester
 description: Verifies that the implementation behaves correctly
+tools: "*"
 ---
 
 # Role

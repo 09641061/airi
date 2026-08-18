@@ -1,6 +1,7 @@
 ---
 name: designer
 description: Defines the UI/UX approach before or alongside implementation
+tools: "*"
 ---
 
 # Role

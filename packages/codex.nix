@@ -2,7 +2,7 @@
 let
   version = "0.147.0"; # nix-update: version
   tag = "rust-v0.147.0"; # nix-update: tag
-  hash = "sha256-Akbi53ODTgfw+1JJ7W660S5FkeYI+Me7l91qlpBUTDY="; # nix-update: hash
+  hash = "sha256-vXWNU9VuQdxl4EX0WJ33mgOO0ZegEa3LUqJY5q1kz9o="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "codex";
@@ -11,11 +11,14 @@ pkgs.stdenv.mkDerivation {
   # Official prebuilt binary from OpenAI's GitHub release for this tag
   # (github.com/openai/codex/releases) — no build from source, no npm.
   src = pkgs.fetchurl {
-    url = "https://github.com/openai/codex/releases/download/${tag}/codex-x86_64-unknown-linux-musl.tar.gz";
+    # The package archive includes codex, codex-code-mode-host, bwrap,
+    # ripgrep, and the other runtime resources required by Code Mode.
+    url = "https://github.com/openai/codex/releases/download/${tag}/codex-package-x86_64-unknown-linux-musl.tar.gz";
     inherit hash;
   };
 
   nativeBuildInputs = [ pkgs.autoPatchelfHook ];
+  buildInputs = [ pkgs.ncurses ];
 
   unpackPhase = ''
     runHook preUnpack
@@ -25,7 +28,13 @@ pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    install -Dm755 codex-x86_64-unknown-linux-musl $out/bin/codex
+    # Keep the upstream package layout: the CLI resolves the host and
+    # runtime resources relative to these directories.
+    install -Dm755 bin/codex $out/bin/codex
+    install -Dm755 bin/codex-code-mode-host $out/bin/codex-code-mode-host
+    cp -r codex-resources $out/codex-resources
+    cp -r codex-path $out/codex-path
+    install -Dm644 codex-package.json $out/codex-package.json
     runHook postInstall
   '';
 

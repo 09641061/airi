@@ -6,7 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 tag=$(gh release view --repo openai/codex --json tagName -q .tagName)
 version=${tag#rust-v}
-url="https://github.com/openai/codex/releases/download/${tag}/codex-x86_64-unknown-linux-musl.tar.gz"
+url="https://github.com/openai/codex/releases/download/${tag}/codex-package-x86_64-unknown-linux-musl.tar.gz"
 
 echo "latest codex: $tag"
 base32=$(nix-prefetch-url "$url" 2>/dev/null | tail -1)

@@ -1,7 +1,7 @@
 { pkgs }:
 let
-  version = "1.1.13"; # nix-update: version
-  hash = "sha256-7cfDK1q0/C5NoDOB/ug+1WbeprVrVvkynNE813lHodk="; # nix-update: hash
+  version = "1.1.15"; # nix-update: version
+  hash = "sha256-0LHW82eKBhkVyuvEMZMOJAuGO/QFk2nAjG/86yTma18="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "antigravity-cli";

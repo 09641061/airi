@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Designs the implementation plan before development begins
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

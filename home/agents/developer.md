@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Implements code changes according to the given requirement or plan
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

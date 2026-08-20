@@ -1,7 +1,7 @@
 ---
 name: coordinator
 description: Orchestrates the other agents through the full task pipeline
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

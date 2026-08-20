@@ -1,7 +1,7 @@
 ---
 name: designer
 description: Defines the UI/UX approach before or alongside implementation
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

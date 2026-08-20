@@ -1,7 +1,7 @@
 ---
 name: explorer
 description: Investigates the codebase and reports relevant context
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Evaluates the overall quality of the implementation
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

@@ -1,7 +1,7 @@
 ---
 name: tester
 description: Verifies that the implementation behaves correctly
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

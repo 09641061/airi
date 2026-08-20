@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: Gathers external technical documentation and evidence
-tools: "*"
+tools: "read,bash,edit,write,lsp_diagnostics,lsp_fix"
 ---
 
 # Role

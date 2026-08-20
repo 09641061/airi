@@ -1,8 +1,8 @@
 # airi
 
-Flake packaging four AI coding CLIs — `claude-code`, `codex`, `antigravity-cli`,
-`pi-coding-agent` — each pinned to its own `nixpkgs` input, so each can be
-updated independently while staying fully reproducible.
+Flake packaging AI coding tools — `claude-code`, `codex`, `antigravity-cli`,
+`pi-coding-agent`, and `herdr` — as reproducible Nix derivations that fetch
+official prebuilt releases.
 
 All four already ship in `nixpkgs`; this flake just re-exports them, one
 input per tool.
@@ -16,6 +16,7 @@ packages/
   codex/default.nix
   agy/default.nix
   pi/default.nix
+  herdr/default.nix
 ```
 
 ## Tools
@@ -26,6 +27,7 @@ packages/
 | codex | `codex` | `codex` | |
 | antigravity-cli | `agy` | `antigravity-cli` | unfree, `allowUnfree` already set |
 | pi-coding-agent | `pi` | `pi-coding-agent` | |
+| herdr | `herdr` | — | terminal workspace manager |
 
 ## Build
 
@@ -34,7 +36,8 @@ nix build .#claude-code
 nix build .#codex
 nix build .#antigravity-cli
 nix build .#pi-coding-agent
-nix build .#default   # all four via symlinkJoin
+nix build .#herdr
+nix build .#default   # all tools via symlinkJoin
 ```
 
 ## Update one tool

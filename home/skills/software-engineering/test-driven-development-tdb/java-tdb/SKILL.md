@@ -1,5 +1,5 @@
 ---
-name: java-spring-unit-testing
+name: java-tdb
 description: Write unit tests for a Domain-Driven Design bounded context in Java/Spring Boot — value objects, enums, commands, queries, aggregates, entities, domain/application services, ACL, controllers, resources, transformers. Use whenever asked to write, review, or scaffold unit tests (JUnit 5/Mockito/AssertJ) for a Java Spring codebase following DDD/hexagonal patterns.
 ---
 

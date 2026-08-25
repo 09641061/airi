@@ -1,5 +1,5 @@
 ---
-name: nextjs-ddd-testing
+name: next-tdb
 description: Write tests for a Next.js App Router application built with Domain-Driven Design — domain model, commands/queries, application services, infrastructure adapters, Client/Server Components, Server Actions, Route Handlers, integration and E2E flows. Use whenever asked to write, review, or scaffold tests (Vitest/React Testing Library/Playwright/MSW) for a Next.js codebase following DDD/hexagonal patterns.
 ---
 

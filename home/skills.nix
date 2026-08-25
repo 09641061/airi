@@ -1,34 +1,34 @@
 { lib, ... }:
 
 let
-  skills = [
-    { path = "operating-systems/nixos-multi-host-architecture"; }
-    { path = "software-design/design-system-patterns"; }
-    { path = "software-design/frontend-design"; }
-    { path = "software-design/impeccable"; }
-    { path = "software-design/shadcn"; }
-    { path = "software-design/tailwind-design-system"; }
-    { path = "software-design/ui-design"; }
-    { path = "software-design/vercel-composition-patterns"; }
-    { path = "software-design/web-design-guidelines"; }
-    { path = "software-engineering/domain-driven-design-ddd/angular-ddd"; }
-    { path = "software-engineering/domain-driven-design-ddd/flutter-ddd"; }
-    { path = "software-engineering/domain-driven-design-ddd/java-25-ddd"; }
-    { path = "software-engineering/domain-driven-design-ddd/next-ddd"; }
-    { path = "software-engineering/test-driven-development-tdb/java-tdb"; }
-    { path = "software-engineering/test-driven-development-tdb/next-tdb"; }
-    { path = "software-testing-qa/testing-by-method/mutation"; flatName = "mutation-testing"; }
-  ];
+  # Every directory containing a SKILL.md is a skill. Discovered, not listed by hand:
+  # a manual list silently drops any skill nobody remembers to register.
+  findSkills = prefix: dir:
+    lib.concatLists (lib.mapAttrsToList (name: type:
+      let
+        path = if prefix == "" then name else "${prefix}/${name}";
+      in
+        if type != "directory" then []
+        else if builtins.pathExists (dir + "/${name}/SKILL.md") then [ path ]
+        else findSkills path (dir + "/${name}")
+    ) (builtins.readDir dir));
 
-  mkFiles = target: flatten: lib.listToAttrs (map (skill:
+  skills = findSkills "" ./skills;
+
+  mkFiles = target: flatten: lib.listToAttrs (map (path:
     let
-      flatName = skill.flatName or (lib.last (lib.splitString "/" skill.path));
+      flatName = lib.last (lib.splitString "/" path);
     in {
-      name = if flatten then "${target}/${flatName}" else "${target}/${skill.path}";
-      value.source = ./skills/${skill.path};
+      name = if flatten then "${target}/${flatName}" else "${target}/${path}";
+      value.source = ./skills/${path};
     }
   ) skills);
+
+  flatNames = map (p: lib.last (lib.splitString "/" p)) skills;
+  duplicates = lib.subtractLists (lib.unique flatNames) flatNames;
 in
+assert lib.assertMsg (duplicates == [])
+  "home/skills.nix: duplicate skill directory names would collide in the flattened agent dirs: ${toString duplicates}";
 {
   home.file =
     (mkFiles ".claude/skills" true)

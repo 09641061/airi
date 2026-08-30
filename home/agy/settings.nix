@@ -1,14 +1,17 @@
 { ... }:
 
 {
-  # Antigravity CLI / IDE settings configuration
-  # Sets execution policies to allow automated subagent execution without
-  # repetitive manual approval prompts for standard file and command operations.
+  # Antigravity CLI / IDE settings configuration.
+  # Use the documented settings schema so outside-workspace file access and
+  # command execution do not keep prompting during agent workflows.
   home.file.".gemini/antigravity-cli/settings.json".text = builtins.toJSON {
-    toolExecutionPolicy = "always-proceed";
-    fileAccessPolicy = "allow";
-    internetAccessPolicy = "allow";
-    commandAllowlist = [ "*" ];
-    artifactReviewMode = "always-proceed";
+    toolPermission = "always-proceed";
+    artifactReviewPolicy = "always-proceed";
+    allowNonWorkspaceAccess = true;
+    permissions = {
+      allow = [
+        "read_file(/home/giks/.config)"
+      ];
+    };
   };
 }

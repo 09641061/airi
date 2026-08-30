@@ -3,6 +3,7 @@
   imports = [
     ./home/claude/agents.nix
     ./home/agy/agents.nix
+    ./home/agy/settings.nix
     ./home/codex/agents.nix
     ./home/codex/settings.nix
     ./home/pi/agents.nix

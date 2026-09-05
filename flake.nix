@@ -25,13 +25,18 @@
         type = "app";
         program = toString (
           pkgs.writeShellScript "update-${name}" ''
-            exec bash ${
-              if name == "claude-code" then "${self}/packages/claude/update-claude-code.sh"
-              else if name == "codex" then "${self}/packages/codex/update-codex.sh"
-              else if name == "pi-coding-agent" then "${self}/packages/pi/update-pi-coding-agent.sh"
-              else if name == "herdr" then "${self}/packages/herdr/update-herdr.sh"
-              else "${self}/packages/agy/update-antigravity-cli.sh"
-            } "$@"
+            script_dir="$(pwd)/packages"
+            if [ ! -d "$script_dir" ]; then
+              echo "Error: Run this update script from the airi repository root." >&2
+              exit 1
+            fi
+            exec bash "$script_dir/${
+              if name == "claude-code" then "claude/update-claude-code.sh"
+              else if name == "codex" then "codex/update-codex.sh"
+              else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
+              else if name == "herdr" then "herdr/update-herdr.sh"
+              else "agy/update-antigravity-cli.sh"
+            }" "$@"
           ''
         );
       };

@@ -1,7 +1,7 @@
 { pkgs }:
 let
-  version = "0.8.2"; # nix-update: version
-  hash = "sha256-l2FQoU1JDJSyQ+ouGn6y37Z/EuNrGC25CTb2co5q7PQ="; # nix-update: hash
+  version = "0.9.0"; # nix-update: version
+  hash = "sha256-T6GgEVjdgEPaktMbJweAsNzBBgMDjZthysTYGrY/tx8="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "herdr";

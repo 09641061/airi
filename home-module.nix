@@ -9,7 +9,7 @@
     ./home/pi/agents.nix
     ./home/pi/settings.nix
     ./home/pi/packages.nix
-    ./home/herdr/collie.nix
+    (import ./home/herdr/collie.nix { inherit collie; })
     ./home/skills.nix
     pi.homeModules.default
   ];

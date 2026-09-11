@@ -1,4 +1,4 @@
-{ pi, ... }:
+{ pi, collie, ... }:
 {
   imports = [
     ./home/claude/agents.nix
@@ -9,6 +9,7 @@
     ./home/pi/agents.nix
     ./home/pi/settings.nix
     ./home/pi/packages.nix
+    ./home/herdr/collie.nix
     ./home/skills.nix
     pi.homeModules.default
   ];

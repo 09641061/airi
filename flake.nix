@@ -78,7 +78,10 @@
       };
 
       homeModules.ai = { ... }@args:
-        import ./home-module.nix (args // { inherit pi; });
+        import ./home-module.nix (args // {
+          inherit pi;
+          collie = collie-package;
+        });
 
       # Per-tool updaters: pull the latest official release, recompute the
       # hash, and rewrite the version/hash lines in packages/<tool>.nix.

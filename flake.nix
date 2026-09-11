@@ -4,10 +4,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     pi.url = "github:lukasl-dev/pi.nix";
+    collie.url = "github:AltanS/collie";
   };
 
   outputs =
-    { self, nixpkgs, pi, ... }:
+    { self, nixpkgs, pi, collie, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -20,6 +21,7 @@
       antigravity-cli = import ./packages/agy { inherit pkgs; };
       pi-coding-agent = import ./packages/pi { inherit pkgs; };
       herdr = import ./packages/herdr { inherit pkgs; };
+      collie-package = collie.packages.${system}.collie;
 
       mkUpdateApp = name: {
         type = "app";
@@ -40,6 +42,14 @@
           ''
         );
       };
+
+      install-collie-plugin = pkgs.writeShellApplication {
+        name = "install-collie-plugin";
+        runtimeInputs = [ herdr ];
+        text = ''
+          exec herdr plugin install AltanS/collie "$@"
+        '';
+      };
     in
     {
       packages.${system} = {
@@ -51,6 +61,8 @@
           herdr
           ;
 
+        collie = collie-package;
+
         # Install all tools at once if you want.
         default = pkgs.symlinkJoin {
           name = "airi-tools";
@@ -60,6 +72,7 @@
             antigravity-cli
             pi-coding-agent
             herdr
+            collie-package
           ];
         };
       };
@@ -80,6 +93,10 @@
         update-pi-coding-agent = mkUpdateApp "pi-coding-agent";
         update-herdr = mkUpdateApp "herdr";
         update-antigravity-cli = mkUpdateApp "antigravity-cli";
+        install-collie-plugin = {
+          type = "app";
+          program = "${install-collie-plugin}/bin/install-collie-plugin";
+        };
       };
     };
 }

@@ -28,6 +28,24 @@
         "type": "github"
       }
     },
+    "collie": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1789053635,
+        "narHash": "sha256-ccjg5grU5IN4dTrifIB6PVlXz/FiucEthFzymtTFO28=",
+        "owner": "AltanS",
+        "repo": "collie",
+        "rev": "ee3338a2e2ef1f8b002103a98d070217ecf8cf22",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AltanS",
+        "repo": "collie",
+        "type": "github"
+      }
+    },
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
@@ -67,6 +85,22 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1788614874,
+        "narHash": "sha256-7QYjT2vHLuX9Z1pdxHXDKCbh1CR3D/2rywB9Tx0MPRg=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c043004d1c6985732bcc1cbc5a9c9aecbbb4e0f0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c043004d1c6985732bcc1cbc5a9c9aecbbb4e0f0",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1786862985,
         "narHash": "sha256-FBJRXmbGXiSUDvYEbfLYRkckayyZ6SK1UEqhCrIZ2Cs=",
         "owner": "NixOS",
@@ -81,7 +115,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1773646010,
         "narHash": "sha256-iYrs97hS7p5u4lQzuNWzuALGIOdkPXvjz7bviiBjUu8=",
@@ -101,7 +135,7 @@
       "inputs": {
         "bun2nix": "bun2nix",
         "jail-nix": "jail-nix",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs_3",
         "systems": "systems"
       },
       "locked": {
@@ -120,7 +154,8 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
+        "collie": "collie",
+        "nixpkgs": "nixpkgs_2",
         "pi": "pi"
       }
     },

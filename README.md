@@ -1,7 +1,7 @@
 # airi
 
 Flake packaging AI coding tools — `claude-code`, `codex`, `antigravity-cli`,
-`pi-coding-agent`, `herdr`, and `collie` — as reproducible Nix derivations that fetch
+`pi-coding-agent`, and `herdr` — as reproducible Nix derivations that fetch
 official prebuilt releases.
 
 The tools are exposed as reproducible flake outputs; each package is sourced
@@ -28,7 +28,6 @@ packages/
 | antigravity-cli | `agy` | `antigravity-cli` | unfree, `allowUnfree` already set |
 | pi-coding-agent | `pi` | `pi-coding-agent` | |
 | herdr | `herdr` | — | terminal workspace manager |
-| collie | `collie` | — | mobile interface for terminal agents |
 
 ## Build
 
@@ -38,7 +37,6 @@ nix build .#codex
 nix build .#antigravity-cli
 nix build .#pi-coding-agent
 nix build .#herdr
-nix build .#collie
 nix build .#default   # all tools via symlinkJoin
 ```
 
@@ -81,12 +79,6 @@ nix flake update
     };
   };
 }
-```
-
-For Collie, install the Herdr plugin once after installing the package:
-
-```sh
-nix run .#install-collie-plugin
 ```
 
 Then update `airi` in the system flake and rebuild:

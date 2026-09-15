@@ -73,17 +73,4 @@ Checklist:
 - [ ] No infrastructure is required
 - [ ] Tests remain deterministic
 
-## Repository Unit Testing Policy. Location: `[context-name]/infrastructure/persistence/jpa/repositories/`
-
-Repositories should generally **not** be unit tested with Mockito unless they contain custom behavior outside Spring Data. Prefer integration tests for derived JPA methods.
-
-- **Do Not Unit Test Spring Data Defaults:** Avoid testing `save`, `findById`, `delete`, or generated methods
-- **Mock Repositories in Services:** Repositories should be mocked when testing command/query services
-- **Custom Logic:** Only test repository-related helper logic if it exists
-- **Persistence Testing:** Use integration tests for real database behavior
-
-Checklist:
-- [ ] Spring Data default methods are not unit tested
-- [ ] Repositories are mocked in service unit tests
-- [ ] Custom repository logic is tested only if present
-- [ ] Database behavior is reserved for integration tests
+> **Persistence tests are out of scope here.** JPA mappings, `@Query` methods, embeddable mappings, and database-level constraints live in [persistence-integration.md](persistence-integration.md), not in this reference. The reminder that *application service tests must mock the domain repository port* is captured in [application-services.md](application-services.md).

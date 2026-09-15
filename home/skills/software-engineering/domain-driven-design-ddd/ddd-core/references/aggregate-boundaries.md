@@ -22,9 +22,21 @@ This keeps the boundary explicit, avoids cascading loads and accidental cascadin
 
 ## Rule 4 — Use eventual consistency outside the boundary
 
-One transaction, one aggregate instance. Whatever must change in other aggregates propagates through **domain events** processed afterwards. If a requirement seems to demand modifying two or more aggregates inside the same ACID transaction, that is a clear symptom that the boundaries are wrong.
+**Default.** One ACID transaction, one aggregate instance. Whatever must change in other aggregates propagates through **domain events** processed afterwards.
 
-This is the rule most teams break first, and it is the one that holds up the other three: without it, rule 2 is impossible to satisfy.
+**When to prefer this default.** Two aggregates are independent (different invariants, different owners, distributed for scalability, or both have an aggregate-specific lifecycle). Edit operations can be retried independently, and partial success is acceptable after replays.
+
+**When to consider an exception (think, do not jump).**
+
+- Two aggregates share an immediate-consistency invariant that the business tolerates nowhere else. Example: invoicing total and the line items billed.
+- The cost of coupling them is small (small aggregates, low contention, local transaction), and the cost of decomposing into events is high (latency, replay complexity, infrastructure that does not yet exist).
+- A bounded context sits inside one deployable, the writes are colocated, and there is no eventual-consistency middleware to lean on yet.
+
+**When NOT to relax.** (a) It would split a true invariant across deployable units you cannot coordinate. (b) One aggregate is large and you are tempted to grow it to "remove the cross-aggregate transaction" — that is the god aggregate anti-pattern, not a fix. (c) The "consistency" you want is operational explainability, not a real business invariant.
+
+If a requirement seems to demand modifying two or more aggregates inside the same ACID transaction, that is **one** signal that the boundaries may be wrong; it is not a verdict. Recheck rule 2, ask the business, and if the exception survives the questions above, persist both roots in one local transaction explicitly and document why.
+
+This is the rule most teams break first, and it is the one that holds up the other three: without it, rule 2 is impossible to satisfy *as a default*. The exception column above must stay short.
 
 ## How to apply them
 

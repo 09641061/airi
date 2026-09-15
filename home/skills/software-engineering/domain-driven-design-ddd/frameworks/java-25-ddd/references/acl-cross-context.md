@@ -2,6 +2,8 @@
 
 Use this whenever a bounded context needs data or operations from another bounded context. **Never call another context's internals directly** — always go through an ACL facade.
 
+> **Layer reminder (read first).** The facade exposes a public contract in `interfaces/acl/`. Its implementation depends on the provider context's **application** command/query services (`application/internal/...`), never on `domain/services/`. Domain services are pure policies/calculators and are not appropriate as consumers of ACL facades.
+
 ## Step 1: Identify Communication Needs
 
 ```
@@ -53,8 +55,8 @@ package com.acme.center.platform.[contextb].application.acl;
 
 import com.acme.center.platform.[contextb].domain.model.commands.Create[Entity]Command;
 import com.acme.center.platform.[contextb].domain.model.queries.Get[Entity]By[Field]Query;
-import com.acme.center.platform.[contextb].domain.services.[Entity]CommandService;
-import com.acme.center.platform.[contextb].domain.services.[Entity]QueryService;
+import com.acme.center.platform.[contextb].application.internal.commandservices.[Entity]CommandService;
+import com.acme.center.platform.[contextb].application.internal.queryservices.[Entity]QueryService;
 import com.acme.center.platform.[contextb].interfaces.acl.[ContextB]ContextFacade;
 import org.springframework.stereotype.Service;
 
@@ -96,9 +98,6 @@ public class [ContextB]ContextFacadeImpl implements [ContextB]ContextFacade {
 // File: [context-a]/domain/model/valueobjects/[Entity]Id.java
 package com.acme.center.platform.[contexta].domain.model.valueobjects;
 
-import jakarta.persistence.Embeddable;
-
-@Embeddable
 public record [Entity]Id(Long [entity]Id) {
     public [Entity]Id {
         if ([entity]Id == null || [entity]Id <= 0) {
@@ -107,6 +106,8 @@ public record [Entity]Id(Long [entity]Id) {
     }
 }
 ```
+
+> The domain value object has **no** JPA annotation. If the consumer context persists the foreign reference, define a JPA-side embeddable in `infrastructure/persistence/jpa/embeddables/[Entity]IdEmbeddable.java` and map it explicitly. Do not put `@Embeddable` on the domain class.
 
 **Step 7: Create External Service (ACL Layer)**
 

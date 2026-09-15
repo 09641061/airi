@@ -128,8 +128,12 @@ export class Money {
   private constructor(private readonly amount: number, private readonly currency: string) {}
 
   public static of(amount: number, currency: string): Money {
+    if (!Number.isFinite(amount)) throw new Error('Amount must be a finite number.');
     if (amount < 0) throw new Error('Amount cannot be negative.');
     if (!currency || currency.length !== 3) throw new Error('Currency must be a 3-letter ISO code.');
+    // Half-even rounding to two decimals is one policy; choose the one that fits
+    // the currency and the domain (some currencies have no minor unit, others have
+    // three). Do NOT treat two-decimal rounding as universal.
     return new Money(Math.round(amount * 100) / 100, currency.toUpperCase());
   }
 
@@ -140,6 +144,14 @@ export class Money {
       throw new Error(`Cannot add ${this.currency} to ${other.currency}.`);
     }
     return Money.of(this.amount + other.amount, this.currency);
+  }
+
+  public amount(): number {
+    return this.amount;
+  }
+
+  public currency(): string {
+    return this.currency;
   }
 
   public equals(other: Money): boolean {
@@ -183,9 +195,11 @@ export class Order {
   public place(): void {
     this.assertDraft();
     if (this.items.length === 0) throw new Error('An order cannot be placed with no items.');
-    this.status = OrderStatus.PLACED;
+    // Compute first so a failed Money.add (currency mismatch, etc.) does not leave
+    // the order marked PLACED with no recorded event.
     const total = this.total();
-    this.events.push(new OrderPlaced(this.id.value, this.customerId.value, total.value, this.currency));
+    this.status = OrderStatus.PLACED;
+    this.events.push(new OrderPlaced(this.id.value, this.customerId.value, total.amount(), this.currency));
   }
 
   public pullEvents(): DomainEvent[] {

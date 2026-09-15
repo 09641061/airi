@@ -1,6 +1,8 @@
 # Step 5 — Zero-Downtime Schema Migrations (Expand / Contract)
 
-In production databases operating under continuous traffic, altering tables or locking schemas causes request timeouts, connection pool exhaustion, and outages. All schema changes must follow the **Expand / Contract (Parallel Run)** pattern.
+In production databases operating under continuous traffic, altering tables or locking schemas causes request timeouts, connection pool exhaustion, and outages. Schema changes should follow the **Expand / Contract (Parallel Run)** pattern to **minimize** the time and the lock surface under load. This pattern does not, by itself, guarantee zero downtime: statements can still queue behind long-running transactions, batches reduce lock duration but do not eliminate locks, and several PostgreSQL DDL operations have caveats listed below. Treat "zero-downtime" here as "minimize the impact window, then verify with realistic load", not as a hard guarantee.
+
+Read the rest of this file as a menu of tactics, not as a recipe that fits every change. Apply where the surrounding traffic, lock_timeout, and rollback policy permit; do not apply blindly to temp tables or to empty tables where the cost of locking is negligible.
 
 ---
 

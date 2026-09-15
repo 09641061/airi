@@ -43,13 +43,29 @@ export interface ContextBContextFacade {
 }
 ```
 
+> Interfaces are erased at runtime. They cannot be used as Angular DI tokens
+> directly. Expose them through an `InjectionToken` bound by a composition
+> or root module.
+
+```ts
+// File: [context-b]/interfaces/acl/[context-b]-context-facade.token.ts
+
+import { InjectionToken } from '@angular/core';
+import { ContextBContextFacade } from './[context-b]-context-facade';
+
+export const CONTEXT_B_CONTEXT_FACADE = new InjectionToken<ContextBContextFacade>(
+  'ContextBContextFacade',
+);
+```
+
 **Step 5: Implement ACL Facade**
 
 ```ts
 // File: [context-b]/application/acl/[context-b]-context-facade.impl.ts
 
-import { Injectable, inject } from '@angular/core';
-import { ContextBContextFacade } from '../../interfaces/acl/context-b-context-facade';
+import { Injectable, inject, EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
+import { ContextBContextFacade } from '../../interfaces/acl/[context-b]-context-facade';
+import { CONTEXT_B_CONTEXT_FACADE } from '../../interfaces/acl/[context-b]-context-facade.token';
 import { EntityCommandService } from '../internal/commandservices/entity-command-service';
 import { EntityQueryService } from '../internal/queryservices/entity-query-service';
 
@@ -67,6 +83,17 @@ export class ContextBContextFacadeImpl implements ContextBContextFacade {
     const entity = await this.entityQueryService.handle({ identifier });
     return entity ? entity.id : 0;
   }
+}
+
+/**
+ * Bind the token to the implementation so that `inject(CONTEXT_B_CONTEXT_FACADE)`
+ * in any consumer resolves to ContextBContextFacadeImpl. Call this once in
+ * the root bootstrap providers (or the composition module of context-b).
+ */
+export function provideContextBContextFacade(): EnvironmentProviders {
+  return makeEnvironmentProviders([
+    { provide: CONTEXT_B_CONTEXT_FACADE, useExisting: ContextBContextFacadeImpl },
+  ]);
 }
 ```
 
@@ -93,12 +120,15 @@ export const createEntityId = (entityId: number): EntityId => {
 // File: [context-a]/application/internal/outboundservices/acl/external-entity.service.ts
 
 import { Injectable, inject } from '@angular/core';
-import { ContextBContextFacade } from '../../../../context-b/interfaces/acl/context-b-context-facade';
-import { EntityId, createEntityId } from '../../../domain/model/valueobjects/entity-id.value-object';
+// Five-level ascent: internal/outboundservices/acl -> internal/outboundservices
+//   -> internal -> application -> [context-a], then DOWN to the sibling context-b.
+// Package aliases (for example '@acme/context-b/...') are preferred in real projects.
+import { CONTEXT_B_CONTEXT_FACADE } from '../../../../../context-b/interfaces/acl/context-b-context-facade.token';
+import { EntityId, createEntityId } from '../../../../domain/model/valueobjects/entity-id.value-object';
 
 @Injectable({ providedIn: 'root' })
 export class ExternalEntityService {
-  private readonly contextBContextFacade = inject(ContextBContextFacade);
+  private readonly contextBContextFacade = inject(CONTEXT_B_CONTEXT_FACADE);
 
   async fetchEntityByField(field: string): Promise<EntityId | null> {
     const entityId = await this.contextBContextFacade.findEntityIdByField(field);

@@ -21,7 +21,15 @@ For the language-agnostic modeling rules behind this skill — subdomains, bound
 6. Use the `inject()` function for dependency injection instead of constructor parameter injection — in services, guards, resolvers, and components alike.
 7. Use the built-in control flow syntax (`@if`, `@for`, `@switch`) in templates; do not use the legacy `*ngIf`/`*ngFor` structural directives.
 8. Prefer **Signals** for local/derived UI state (`signal`, `computed`, `effect`) over `BehaviorSubject`-based state; keep `Observable`s at the gateway/HTTP boundary and bridge with `toSignal`/`toObservable` when needed.
-9. Target **zoneless change detection** (`provideZonelessChangeDetection()`) as the default for new bounded contexts; avoid relying on `Zone.js`-implicit change detection in new code.
+9. Pin your Angular baseline explicitly and pick the matching zoneless API:
+
+   | Version | Recommended API |
+   | :--- | :--- |
+   | Angular 19 (transition) | `provideExperimentalZonelessChangeDetection()` from `@angular/core` |
+   | Angular 20 (stable) | `provideZonelessChangeDetection()` |
+   | Angular 21+ (zoneless by default) | no provider required; verify `provideZoneChangeDetection` is not used |
+
+   New bounded contexts should target zoneless; avoid `Zone.js`-implicit change detection in new code.
 
 ## Build order
 

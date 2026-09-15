@@ -43,16 +43,16 @@ Relational remains the **correct default** for most business systems.
 | :--- | :--- | :--- |
 | **Atomicity / basic availability** | All or nothing; a failed operation rolls back entirely. | Basic availability via partitions and decentralized replicas. |
 | **Consistency** | Strict, immediate integrity invariant per transaction. | Soft state: data may change without user input. |
-| **Isolation / eventuality** | Concurrent transactions isolated (Read Committed, Serializable). | Eventual consistency: converges within finite time. |
-| **Durability** | Changes persisted irreversibly in the write-ahead log. | Distributed durability by replica quorum. |
+| **Isolation / eventuality** | Concurrent transactions isolated (Read Committed, Serializable). | Eventual consistency: replicas converge once writes stop AND connectivity between replicas is sufficient. The convergence guarantee makes no time-bound promise and says nothing about reads performed before convergence; stronger modes (causal, read-your-writes, linearizable) are engines-and-configuration specific. |
+| **Durability** | Survives committed writes across crashes, depending on configuration (fsync policy, WAL archiving, synchronous replicas). | Configurable per operation via write concern; survives loss of a quorum of replicas only if the surviving replicas actually received the write. |
 | **Primary use case** | Financial systems, critical inventory, transactional orders. | Social feeds, IoT telemetry, mass sessions, web catalogs. |
 
 ### CAP (Brewer, Gilbert & Lynch)
 
 A distributed data system subject to network partitions (`P`) can guarantee only two of consistency, availability, and partition tolerance simultaneously — in practice, `P AND (C OR A)`.
 
-- **CP** — prioritizes linearizable consistency over availability; under partition it rejects reads/writes from disconnected nodes (PostgreSQL with strict synchronous replication, MongoDB with `w: "majority"`).
-- **AP** — prioritizes availability, accepting temporary divergence resolved later (Cassandra, DynamoDB, CouchDB).
+- **CP** — prioritizes linearizable consistency over availability; under partition it rejects reads/writes from disconnected nodes. Achieving linearizable reads in MongoDB requires BOTH `w: "majority"` write concern AND `readConcern: "linearizable"` (or the equivalent read preference); a single write concern setting is not sufficient.
+- **AP** — prioritizes availability, accepting temporary divergence resolved later (Cassandra, DynamoDB, CouchDB). Note that some AP engines also offer strongly-consistent modes at the cost of availability under partition; the label is configuration-dependent, not absolute.
 
 ### PACELC (Abadi)
 

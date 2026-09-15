@@ -41,6 +41,8 @@ An intermediate architectural layer of adapters, facades, and translators that c
 
 Shape: `legacy raw data / RPC → integration facade → protocol adapter → domain translator → clean domain entities`. An ACL that only renames fields is an indirection layer with no value; it must translate semantics.
 
+> **External validation.** Migrating an integration from one transport (for example, a message broker such as Kafka) to another (synchronous HTTP) behind the *same* domain interface does not require redesigning the consumer. The strategic choice — ACL vs. Conformist vs. Open Host Service — survives the transport change, because the choice is about model ownership, not the wire protocol. Useful when retrofitting a deployed system whose only real problem is transport.
+
 ### Open Host Service (OHS) / Published Language (PL)
 The upstream exposes a standardized, documented API (OHS) using a public, formal, versioned interchange format (PL: JSON Schema, XML, Protobuf), maintaining backward compatibility through stable contracts. Use for cross-cutting services with many simultaneous consumers.
 

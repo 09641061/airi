@@ -33,8 +33,28 @@ Payment <|-- BankTransferPayment
 
 ### Single Table Inheritance
 - **Structure**: one table holds the whole hierarchy, with a discriminator column (`payment_type`).
-- **Pros**: polymorphic queries with no joins; best raw performance.
-- **Cons**: subclass-specific columns must be nullable, so schema-level integrity is lost.
+- **Pros**: polymorphic queries with no joins; best raw performance on shallow hierarchies.
+- **Cons**: subclass-specific columns must be nullable, so `NOT NULL` on subtype-only fields is lost *unless* you add a `CHECK` constraint conditioned on the discriminator. With that pattern, schema-level integrity can be preserved:
+
+  ```sql
+  CREATE TABLE vehicles (
+    id          UUID PRIMARY KEY,
+    kind        TEXT NOT NULL CHECK (kind IN ('CAR', 'TRUCK', 'ELECTRIC_CAR')),
+    -- common columns
+    brand       TEXT NOT NULL,
+    -- car-only
+    seats       INT,
+    -- truck-only
+    payload_kg  NUMERIC,
+    -- electric car-only
+    battery_kwh NUMERIC,
+    CONSTRAINT chk_car_seats        CHECK (kind <> 'CAR'          OR seats        IS NOT NULL),
+    CONSTRAINT chk_truck_payload    CHECK (kind <> 'TRUCK'        OR payload_kg   IS NOT NULL),
+    CONSTRAINT chk_ev_battery       CHECK (kind <> 'ELECTRIC_CAR' OR battery_kwh IS NOT NULL)
+  );
+  ```
+
+  Whether STI is the right choice depends on the subclass cardinality, the typical query pattern, and whether per-subtype invariants are worth encoding in DDL. There is no universal "best" — measure on your data before committing to one strategy.
 
 ### Class Table Inheritance (joined tables)
 - **Structure**: the base class has its own table; each subclass has a separate table whose primary key is also a foreign key to the base table.
@@ -46,7 +66,7 @@ Payment <|-- BankTransferPayment
 - **Pros**: no artificial nulls; fast reads of a single specific subclass.
 - **Cons**: primary keys must not collide across tables; polymorphic queries over the base class require expensive `UNION ALL`.
 
-Details and the surrounding pattern family: [poeaa/references/inheritance-mapping.md](../../software-architecture/poeaa/references/inheritance-mapping.md) and [poeaa/references/or-structural-patterns.md](../../software-architecture/poeaa/references/or-structural-patterns.md).
+Details and the surrounding pattern family are documented in *Patterns of Enterprise Application Architecture* by Martin Fowler (§Inheritance Mappers and §Structural Patterns). The cross-project documentation system does not include a `poeaa/` directory; consult the book directly.
 
 ## The N+1 problem
 
@@ -61,13 +81,14 @@ Mitigations:
    INNER JOIN order_items oi ON oi.order_id = o.id
    WHERE o.status = 'COMPLETED';
    ```
+   Note: a join alone does not by itself prove N+1 is gone for the *use case*. If the result set is large, an unfiltered join can defeat pagination or hold too many child rows per parent; pair join-fetch with a projection DTO or batch when the cardinality is unbounded.
 2. **Batch fetching** — configure the ORM to load associations in batches via `WHERE parent_id IN (?, ?, ...)`, reducing the count to `1 + ceil(N / batch_size)`.
 3. **Entity graphs / projection DTOs** — declare projections selecting only the columns the use case actually needs.
 
 ## Working with an ORM without losing the domain
 
 - **The domain does not import the ORM.** If the model carries persistence annotations, the dependency points the wrong way; use external mapping or a translation layer.
-- **Map aggregates, not tables.** One repository per aggregate root. For the Java/Spring mechanics of that repository, see [java-25-ddd/references/infrastructure-repositories.md](../../domain-driven-design-ddd/java-25-ddd/references/infrastructure-repositories.md) rather than reinventing it here; for the identity/lifecycle rules the mapping must respect, see [ddd-core: object lifecycle](../../domain-driven-design-ddd/ddd-core/references/object-lifecycle.md).
+- **Map aggregates, not tables.** One repository per aggregate root. For the Java/Spring mechanics of that repository, see [frameworks/java-25-ddd/references/infrastructure-repositories.md](../../domain-driven-design-ddd/frameworks/java-25-ddd/references/infrastructure-repositories.md) rather than reinventing it here; for the identity/lifecycle rules the mapping must respect, see [ddd-core: object lifecycle](../../domain-driven-design-ddd/ddd-core/references/object-lifecycle.md).
 - **Decide the fetch strategy per use case**, not globally: lazy by default, with explicit eager loading (`join fetch`, `include`) in the queries that walk the graph.
 - **Read the generated SQL.** An ORM whose queries nobody ever looks at ends in performance problems nobody can explain.
 - **Drop to SQL without guilt** for reports and complex read queries — that is exactly what separates the query stack in [CQRS](../../domain-driven-design-ddd/ddd-core/references/cqrs.md).

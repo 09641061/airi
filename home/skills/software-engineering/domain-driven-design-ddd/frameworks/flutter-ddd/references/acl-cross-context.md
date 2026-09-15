@@ -100,13 +100,26 @@ part 'entity_id.freezed.dart';
 
 @freezed
 sealed class EntityId with _$EntityId {
+  // Note: copyWith in Freezed routes through this factory, so every domain
+  // construction path must validate. Validation lives in _guard, called from
+  // both the public factory and from any converter you control.
   const factory EntityId(int value) = _EntityId;
 
   factory EntityId.create(int entityId) {
-    if (entityId <= 0) {
-      throw ArgumentError('Entity ID must be a positive number');
-    }
+    _guard(entityId);
     return EntityId(entityId);
+  }
+
+  factory EntityId.unsafe(int entityId) {
+    // Reserved for mappers that have already validated; do not call from
+    // application code or adapters.
+    return EntityId(entityId);
+  }
+
+  static void _guard(int entityId) {
+    if (!entityId.isFinite || entityId <= 0) {
+      throw ArgumentError('Entity ID must be a positive integer');
+    }
   }
 }
 ```
@@ -117,8 +130,11 @@ sealed class EntityId with _$EntityId {
 // File: [context_a]/application/internal/outboundservices/acl/external_entity_service.dart
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../../context_b/interfaces/acl/context_b_context_facade.dart';
-import '../../../domain/model/valueobjects/entity_id.dart';
+// Importing the abstract class alone does not expose the @riverpod-generated
+// provider symbol. Always import the implementation file as well (or a barrel
+// file that re-exports both).
+import '../../../../../context_b/application/acl/context_b_context_facade_impl.dart';
+import '../../../../domain/model/valueobjects/entity_id.dart';
 
 part 'external_entity_service.g.dart';
 

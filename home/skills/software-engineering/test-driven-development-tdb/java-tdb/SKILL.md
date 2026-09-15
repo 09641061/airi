@@ -25,6 +25,7 @@ Follow this order — each step builds on the previous one. Load the matching re
 | 2 | Commands & queries | [references/commands-and-queries.md](references/commands-and-queries.md) |
 | 3 | Domain events, aggregates, entities, domain services, repository policy | [references/domain-model.md](references/domain-model.md) |
 | 4 | Application command/query services & ACL services | [references/application-services.md](references/application-services.md) |
+| 4.5 | Persistence adapters (JPA mappings, custom queries, constraints) | [references/persistence-integration.md](references/persistence-integration.md) |
 | 5 | REST controllers, resources, transformers, error handling | [references/rest-layer.md](references/rest-layer.md) |
 
 Before writing tests for any layer, check [references/mocking-and-test-data.md](references/mocking-and-test-data.md): only mock dependencies outside the class under test — never mock value objects, aggregates, or the class under test itself.

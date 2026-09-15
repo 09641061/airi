@@ -13,9 +13,11 @@ For the language-agnostic modeling rules behind this skill — subdomains, bound
 
 ## Core rules
 
-1. No DTO classes **inside the domain model**. DTOs live only at boundaries (REST, ACL, messaging).
-2. No generic mapper classes **inside the domain model**. Mapping at boundaries must be explicit and minimal.
-3. Every REST response is fully documented with OpenAPI/Swagger annotations.
+1. **The domain layer must not import any framework or infrastructure type.** No `org.springframework.*`, no `jakarta.persistence.*`, no Hibernate, no JPA, no Jackson, no SLF4J binding, no JDBC, no PostgreSQL driver. Domain code depends only on JDK + the project's own modules. This rule has priority over any convenience you might gain by adding an annotation.
+2. **No DTO classes inside the domain model.** DTOs live only at boundaries (REST, ACL, messaging).
+3. **No generic mapper classes inside the domain model.** Mapping at boundaries must be explicit and minimal. Mappers themselves are infrastructure, even when the source and target are both domain types.
+4. **Repository ports live in the domain; adapters live in infrastructure.** The domain declares `interface CargoRepository { ... }`; the JPA `JpaRepository` extending adapter that implements it lives in `infrastructure/persistence/jpa/repositories/`. One port per aggregate root, never per table.
+5. **Every REST response is fully documented with OpenAPI/Swagger annotations** in the interfaces layer.
 
 ## Build order
 
@@ -23,10 +25,11 @@ Follow this order — each step's output feeds the next. Load the matching refer
 
 | # | Step | Reference |
 |---|------|-----------|
-| 1 | Value objects (IDs, embeddables) | [references/value-objects.md](references/value-objects.md) |
+| 1 | Value objects (IDs, validated primitives) — no `@Embeddable`, no JPA annotations | [references/value-objects.md](references/value-objects.md) |
 | 2 | Enums | — (plain Java enums, no reference needed) |
 | 3 | Commands & Queries (records) | [references/commands-and-queries.md](references/commands-and-queries.md) |
-| 4 | Domain services (interfaces) | [references/domain-services.md](references/domain-services.md) |
+| 4 | Domain services (pure logic interfaces, e.g. `*Policy`, `*Calculator`) | [references/domain-services.md](references/domain-services.md) |
+| 4.5 | Application service contracts (`*CommandService` / `*QueryService`) and their implementations | [references/application-services.md](references/application-services.md) |
 | 5 | Entities & Aggregate roots | — (use platform's shared auditable base models if available) |
 | 6 | Domain events | [references/events.md](references/events.md) |
 | 7 | Infrastructure repositories | [references/infrastructure-repositories.md](references/infrastructure-repositories.md) |
@@ -40,5 +43,11 @@ Before shipping, check [references/testing-and-observability.md](references/test
 
 ## Source of truth
 
-The original, unsplit guide (kept for traceability) lives at:
-`software-engineering/domain-driven-design-ddd/java/java25-spring.md`.
+The full guide for this skill is split across the reference files linked in the build order above. There is no single combined source document in this repository.
+
+## Related skills
+
+- [ddd-core](../../ddd-core/SKILL.md) — language-agnostic rules (entities, value objects, aggregates, repository ports, CQRS levels).
+- [data-design](../../../data-design/SKILL.md) — physical schema, constraints, indexing, migrations; especially rule 9 ("No ORM leakage into the domain").
+- [http-api-design](../../../software-architecture/http-api-design/SKILL.md) — REST contracts, status codes, RFC 7807/9457 Problem Details, pagination, optimistic concurrency.
+- [java-tdb](../../test-driven-development-tdb/java-tdb/SKILL.md) — testing conventions for this skill.

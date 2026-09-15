@@ -21,11 +21,18 @@ export async function createProductAction(
   _prevState: CreateProductActionState,
   formData: FormData
 ) {
-  const input = createProductSchema.parse({
+  const inputResult = createProductSchema.safeParse({
     name: formData.get('name'),
     categoryId: formData.get('categoryId'),
   })
-  const command = createProductCommand(input)
+  if (!inputResult.success) {
+    return {
+      status: 'error' as const,
+      data: null,
+      error: 'Invalid input. Please check the form and try again.',
+    }
+  }
+  const command = createProductCommand(inputResult.data)
 
   try {
     const service = createProductCommandService()
@@ -33,11 +40,33 @@ export async function createProductAction(
     revalidateTag('products')
     return { status: 'success' as const, data: { id: productId.value }, error: null }
   } catch (error) {
+    // Domain errors thrown by the application service may include a "kind" field
+    // you control. Map known domain kinds to user-safe messages here; everything
+    // else is a generic internal error that must NOT leak SQL, framework, or
+    // provider detail to the client. Log the raw error server-side with a
+    // correlation id.
+    const kind =
+      error && typeof error === 'object' && 'kind' in error
+        ? (error as { kind: string }).kind
+        : undefined
     return {
       status: 'error' as const,
       data: null,
-      error: error instanceof Error ? error.message : 'Unexpected error',
+      error: errorCodeToMessage(kind),
     }
+  }
+}
+
+function errorCodeToMessage(kind?: string): string {
+  switch (kind) {
+    case 'validation':
+      return 'Invalid input. Please check the form and try again.'
+    case 'conflict':
+      return 'This action conflicts with the current state.'
+    case 'forbidden':
+      return 'You are not allowed to perform this action.'
+    default:
+      return 'Something went wrong. Please try again later.'
   }
 }
 ```

@@ -4,7 +4,14 @@ CQRS separates the model that **writes** from the model that **reads**. The just
 
 ## CQS is not CQRS
 
-- **CQS (Bertrand Meyer)** — a class/method-level principle: a method either mutates state and returns `void` (command) or returns a value without altering observable state (query). Applies always, in any code, for free.
+- **CQS (Bertrand Meyer)** — a class/method-level principle: a method either mutates state and returns `void` (command) or returns a value without altering observable state (query). As a default this applies at the method level in any code; the principle is not free of exceptions.
+
+  **When to relax "command returns void" without losing the benefit.**
+  - The command handler must atomically consume state and produce a result the next layer needs (events pulled from the aggregate, a computed snapshot taken inside the same transaction, a fast ID the controller wants to echo back).
+  - A two-call protocol (command then a follow-up query to fetch the freshly-created aggregate) would require an extra round trip AND would race with concurrent writes in a way CQS cannot hide.
+  - The returned value is a *value object* (often an identifier, a snapshot, or an event list), not the mutable aggregate itself. Returning the whole aggregate to the interface layer turns the write model into a read model, which is a separate problem to flag.
+
+  Keep the relaxation explicit in the handler signature; do not let it become a habit.
 - **CQRS (Greg Young)** — an architectural pattern that lifts CQS to the subsystem level, forking object models, execution pipelines, and persistence into a command stack and a query stack. Applies only when the problem justifies it.
 
 Confusing them leads teams to adopt the whole architecture when method-level discipline was enough.
@@ -18,6 +25,15 @@ Flow: `command controller → application service → repository.findById → ag
 
 **Query stack — answers fast.**
 A query **does not go through the aggregate or the domain repository**. It reads directly from a projection optimized for the screen that needs it and returns flat DTOs. There is no business logic in this stack, and that is precisely why it may skip the model without guilt: there is no invariant to protect in a read.
+
+> **Stale projection reconcile (gap to be filled by the project).** A read model updated asynchronously lags behind the write side. Concrete questions each project must answer before relying on such a view:
+>
+> - Maximum acceptable lag (seconds, minutes, eventual)?
+> - Reconcile trigger: periodic poll, webhook hint, push from write side, or hybrid?
+> - User-visible behaviour when a read is stale (loading, error message, optimistic UI, hidden state)?
+> - Idempotency / deduplication on replay, including partial replays from a checkpoint.
+>
+> The pattern itself is named 'stale projection reconcile'; the answers above belong in this skill's project-specific override, not as universal rules.
 
 Flow: `query controller → query service → SELECT against a denormalized view or read store → flat read DTO`.
 

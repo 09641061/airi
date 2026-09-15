@@ -16,11 +16,12 @@ Test:
 
 Mock only the dependencies required by the test, such as:
 
-```text
-next/cache
-next/headers
-next/cookies
-```
+- `next/server` for request/response shapes
+- `next/cache` for cache APIs like `revalidateTag`
+- `next/headers` for `cookies()` (async since Next 15), `headers()`, `draftMode()`
+- any third-party HTTP client your action routes through
+
+Do not confuse `cookies()` from `next/headers` (which is async since Next 15) with `NextRequest#cookies`.
 
 Do not test Next.js framework implementation details.
 

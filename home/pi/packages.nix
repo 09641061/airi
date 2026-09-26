@@ -12,6 +12,7 @@ in
     "npm:@earendil-works/pi-server@${piVersion}"
     "npm:pi-subagents"
     "npm:pi-web-access"
+    "npm:pi-mcp-adapter"
     "npm:@narumitw/pi-lsp"
     "npm:@narumitw/pi-plan-mode"
   ];

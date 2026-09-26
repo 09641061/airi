@@ -1,7 +1,7 @@
 { pkgs }:
 let
-  version = "0.85.1"; # nix-update: version
-  hash = "sha256-SU5Jj0fXTSH0CzOG9qXpIaPUlTGhacq1W72soOof4lo="; # nix-update: hash
+  version = "0.87.1"; # nix-update: version
+  hash = "sha256-gNeN1i1QBJoAa5gdmUxhJVvMEOcwsMJ41OoKdVkJdkw="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "pi-coding-agent";
@@ -18,7 +18,12 @@ pkgs.stdenv.mkDerivation {
     pkgs.autoPatchelfHook
     pkgs.makeWrapper
   ];
-  buildInputs = [ pkgs.stdenv.cc.cc.lib ];
+  buildInputs = [
+    pkgs.stdenv.cc.cc.lib
+    # 0.87.1+ ships native node bindings (linux-platform-x11.node) that link
+    # against libxcb; autoPatchelfHook needs it on the rpath.
+    pkgs.libxcb
+  ];
 
   # Bun-compiled standalone executable — see the comment in
   # packages/claude-code.nix for why stripping breaks it.

@@ -1,5 +1,5 @@
 {
-  description = "airi — CLI agents (claude-code, codex, antigravity-cli, pi-coding-agent, herdr), each packaged as its own Nix derivation that fetches the prebuilt binary directly from the tool's official source.";
+  description = "airi — CLI agents (claude-code, codex, antigravity-cli, pi-coding-agent, herdr, minimax-code), each packaged as its own Nix derivation that fetches the prebuilt binary directly from the tool's official source.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,6 +20,7 @@
       antigravity-cli = import ./packages/agy { inherit pkgs; };
       pi-coding-agent = import ./packages/pi { inherit pkgs; };
       herdr = import ./packages/herdr { inherit pkgs; };
+      minimax-code = import ./packages/mcode { inherit pkgs; };
 
       mkUpdateApp = name: {
         type = "app";
@@ -35,6 +36,7 @@
               else if name == "codex" then "codex/update-codex.sh"
               else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
               else if name == "herdr" then "herdr/update-herdr.sh"
+              else if name == "minimax-code" then "mcode/update-minimax-code.sh"
               else "agy/update-antigravity-cli.sh"
             }" "$@"
           ''
@@ -50,6 +52,7 @@
           antigravity-cli
           pi-coding-agent
           herdr
+          minimax-code
           ;
 
         # Install all tools at once if you want.
@@ -61,6 +64,7 @@
             antigravity-cli
             pi-coding-agent
             herdr
+            minimax-code
           ];
         };
       };
@@ -82,6 +86,7 @@
         update-codex = mkUpdateApp "codex";
         update-pi-coding-agent = mkUpdateApp "pi-coding-agent";
         update-herdr = mkUpdateApp "herdr";
+        update-minimax-code = mkUpdateApp "minimax-code";
         update-antigravity-cli = mkUpdateApp "antigravity-cli";
       };
     };

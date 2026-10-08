@@ -1,8 +1,8 @@
 { pkgs }:
 let
-  version = "0.160.1"; # nix-update: version
-  tag = "rust-v0.160.1"; # nix-update: tag
-  hash = "sha256-NAgBVlkGpwKPa6qpq2hTrdrvIh8AFqFBenwf/dlsIfA="; # nix-update: hash
+  version = "0.162.0"; # nix-update: version
+  tag = "rust-v0.162.0"; # nix-update: tag
+  hash = "sha256-T1c5RMHSBZEJ11ovTQzJwDaXKIIkpeQHcXqd6Y/AEMU="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "codex";

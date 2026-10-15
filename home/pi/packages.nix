@@ -5,15 +5,14 @@ in
 {
   programs.pi.coding-agent.settings.packages = [
     # Async subagents need the unbundled runtime alongside the standalone CLI.
-    # Pi 0.85.1 declares client/server as devDependencies; install them explicitly.
-    # Keep their versions aligned with the configured CLI when updating Pi.
     "npm:@earendil-works/pi-coding-agent@${piVersion}"
-    "npm:@earendil-works/pi-client@${piVersion}"
-    "npm:@earendil-works/pi-server@${piVersion}"
-    "npm:pi-subagents"
-    "npm:pi-web-access"
-    "npm:pi-mcp-adapter"
-    "npm:@narumitw/pi-lsp"
-    "npm:@narumitw/pi-plan-mode"
+    # Client/server publish independently from the CLI, so pin their latest releases.
+    "npm:@earendil-works/pi-client@1.1.0"
+    "npm:@earendil-works/pi-server@1.1.0"
+    "npm:pi-subagents@0.78.0"
+    "npm:pi-web-access@0.40.0"
+    "npm:pi-mcp-adapter@5.3.0"
+    "npm:@narumitw/pi-lsp@0.49.9"
+    "npm:@narumitw/pi-plan-mode@0.59.2"
   ];
 }

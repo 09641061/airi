@@ -1,7 +1,7 @@
 { pkgs }:
 let
-  version = "2.1.296"; # nix-update: version
-  hash = "sha256-JJcuO8hZ+rK0btTB5R99YTDwbTvVUIEaEUZA3jNw0N4="; # nix-update: hash
+  version = "2.1.300"; # nix-update: version
+  hash = "sha256-Z03roLupruR59FA8Q4tJMDtv3TBLmkcbFJd6rsUhVFM="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "claude-code";

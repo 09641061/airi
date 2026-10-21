@@ -1,99 +1,48 @@
 ---
 name: go-ddd
-description: Implement a complete Domain-Driven Design (DDD) bounded context in Go with Gin, PostgreSQL, Koanf, and OpenAPI. Use this skill to design, scaffold, implement, or review Go bounded contexts with clean domain boundaries, repository ports, application services, REST adapters, ACLs, testing, and observability.
+description: Implement or review technology-neutral DDD bounded contexts in Go with Gin confined to the HTTP boundary. Covers pure domain modeling, application use cases, context-owned persistence adapters, REST contracts, ACLs, runtime assembly, testing, and observability without mandating a database or configuration stack.
 ---
 
-# DDD Bounded Context Implementation Guide — Go + Gin
+# DDD Bounded Contexts in Go + Gin
 
-This skill defines a generic standard for implementing a DDD bounded context in **Go with Gin**, following the same 14-section implementation order as the Java/Spring guide. Replace `[context-name]`, `[context-a]`, `[context-b]`, `[Entity]`, and `[Field]` with project-specific names.
+Use this skill to design, implement, or review a Go bounded context. Gin is an HTTP adapter, not a domain or application dependency. Persistence, configuration sources, storage engines, ORMs, migration tools, and dependency-injection frameworks are implementation choices—not DDD requirements.
 
-Use the reference files for the detailed rules, checklists, examples, and configuration snippets. Go snippets use neutral identifiers such as `Entity` and `Field`; update module imports and types for the target module.
+The paths and identifiers below are illustrative. Replace placeholders such as `[context-name]`, `[Entity]`, and `[technology]` with the project's ubiquitous language and actual choices. Preserve established project conventions when they maintain the same boundaries; do not scaffold layers that have no real responsibility.
 
-## Baseline stack
+## Baseline
 
-- Go (stable, organization-approved version)
-- Gin (`github.com/gin-gonic/gin`) for HTTP
-- PostgreSQL with `pgx/v5/pgxpool`
-- `sqlc` (optional) for typed SQL and `goose` for migrations
-- Koanf v2 with YAML for configuration
-- OpenAPI 3.1 for API documentation
-- `log/slog` and OpenTelemetry for observability
-- `testing` and `httptest` for tests
+- Use an organization-approved stable Go release.
+- Use `github.com/gin-gonic/gin` only at HTTP boundaries.
+- Document public HTTP contracts in OpenAPI 3.1.
+- Pass `context.Context` to I/O boundaries for cancellation, deadlines, and request-scoped information.
+- Use `log/slog` for structured logs; add OpenTelemetry when tracing or metrics are needed.
+- Use Go's standard `testing` and `net/http/httptest` packages.
+- Select persistence and configuration per application/context and operational needs; no particular engine, driver, ORM, query generator, migration tool, configuration format, or DI framework is required.
 
-## Naming principle
+## Read the relevant reference
 
-Use **Descriptive/Role-based Naming** or **Explicit Transformation Naming**. Exported Go types use `PascalCase`, methods use `PascalCase` or `camelCase`, and files use `snake_case.go`.
+Load the focused reference for the work at hand; do not front-load every document.
 
-For language-agnostic modeling rules — subdomains, bounded contexts, context mapping, building blocks, aggregate boundaries, object lifecycle, and CQRS adoption levels — see [ddd-core](../../ddd-core/SKILL.md).
+| Concern | Reference |
+|---|---|
+| Dependency rules, package placement, naming, shared code | [Architecture and structure](references/architecture-and-structure.md) |
+| Value Objects, entities, aggregates, states, events, domain services | [Domain model](references/domain-model.md) |
+| Commands, queries, command/query services | [Application layer](references/application-layer.md) |
+| Domain repository ports and context-owned persistence adapters | [Persistence](references/persistence.md) |
+| HTTP resources, Gin controllers, OpenAPI | [REST API](references/rest-api.md) |
+| ACL, context boundaries, Shared Kernel, integration delivery | [Context integration](references/context-integration.md) |
+| Runtime configuration, composition, reliability, observability | [Runtime and observability](references/runtime-and-observability.md) |
+| Unit, adapter, HTTP, and cross-context tests | [Testing](references/testing.md) |
+| Suggested implementation progression and final review | [Implementation workflow](references/implementation-workflow.md) |
 
-## Core rules
+## Default implementation progression
 
-1. **No DTOs in the domain model.** DTOs belong to REST, messaging, or ACL boundaries.
-2. **No generic mapper packages in the domain model.** Convert types explicitly at boundaries.
-3. **Fully document HTTP responses in OpenAPI**, including success and error cases.
-4. **Repository interfaces belong to `[context-name]/domain/repositories/`; PostgreSQL implementations belong to infrastructure.**
-5. `domain/` must not import Gin, SQL drivers, Koanf, or infrastructure packages.
-6. `application/` depends on domain repository interfaces, never concrete PostgreSQL implementations, and receives `context.Context`, not `*gin.Context`.
-7. Use constructor injection; Go does not require Spring annotations.
-8. Keep bounded contexts isolated. Share only contracts expressly designed for integration.
-9. Keep these paths relative to `internal/` at the Go-module root unless noted otherwise.
+Discover context ownership and invariants → model and test domain behavior → define application contracts and domain repository ports → implement only required adapters → add use-case orchestration → expose HTTP contracts if needed → assemble runtime dependencies → add ACL/reliable delivery only when justified → verify behavior, operational needs, and published contracts.
 
-## Layered structure
+Do not let this sequence override a project's existing package conventions or become a reason to introduce unnecessary layers.
 
-```text
-internal/[context-name]/
-  domain/                       # aggregates, value objects, commands, queries, events, ports
-  application/                  # command/query services and outbound ports
-  infrastructure/persistence/   # PostgreSQL adapters and persistence mapping
-  interfaces/rest/              # Gin controllers and request/response resources
-internal/platform/              # configuration, database pool, observability
-internal/bootstrap/             # dependency wiring and route registration
-cmd/api/                        # process entry point and graceful shutdown
-```
+## Related guidance
 
-The domain imports no outer layer. Application services depend on domain ports; infrastructure implements those ports. Gin remains in the REST adapter. `bootstrap` is the composition root that connects interfaces to infrastructure.
-
-## Build order and references
-
-Follow this order. Load the matching reference when reaching each step instead of front-loading every file.
-
-| # | Step | Reference |
-|---|------|-----------|
-| 1 | Value Objects — IDs and validated values | [references/value-objects.md](references/value-objects.md) |
-| 2 | Commands — state-changing intentions | [references/commands-and-queries.md](references/commands-and-queries.md) |
-| 3 | Queries — validated information requests | [references/commands-and-queries.md](references/commands-and-queries.md) |
-| 4 | Events — immutable facts that already happened | [references/events.md](references/events.md) |
-| 5 | Domain Services — business rules outside entities/value objects | [references/domain-services.md](references/domain-services.md) |
-| 6 | Infrastructure Repositories — domain ports and PostgreSQL adapters | [references/infrastructure-repositories.md](references/infrastructure-repositories.md) |
-| 7 | Command Services — write orchestration | [references/application-services.md](references/application-services.md) |
-| 8 | Query Services — bounded read orchestration | [references/application-services.md](references/application-services.md) |
-| 9 | REST Resources — request/response DTOs | [references/rest-layer.md](references/rest-layer.md) |
-| 10 | REST Controllers — Gin HTTP adapters | [references/rest-layer.md](references/rest-layer.md) |
-| 11 | Implementation timeline — entities, aggregates, transformers, outbox | [references/implementation-timeline.md](references/implementation-timeline.md) |
-| 12 | ACL — cross-context contracts and translation | [references/acl-cross-context.md](references/acl-cross-context.md) |
-| 13 | Testing requirements | [references/testing-and-observability.md](references/testing-and-observability.md) |
-| 14 | Observability and reliability | [references/testing-and-observability.md](references/testing-and-observability.md) |
-
-## Configuration and runtime
-
-Use [references/configuration.md](references/configuration.md) for the Koanf/YAML configuration contract, environment overrides, PostgreSQL pool initialization, Gin bootstrap, HTTP timeouts, and graceful shutdown.
-
-The production composition sequence is:
-
-1. Load and validate typed configuration.
-2. Set Gin mode.
-3. Open and verify one PostgreSQL pool.
-4. Create the Gin router with recovery and required middleware.
-5. Let `bootstrap` construct infrastructure adapters and inject them through domain interfaces.
-6. Register routes and start an `http.Server` with configured timeouts.
-7. Handle SIGINT/SIGTERM with graceful shutdown and close the pool.
-
-## Workflow
-
-`discover the bounded context and invariants → model and test value objects/entities/aggregates → define domain ports → implement infrastructure adapters → add command/query services → expose REST contracts → wire dependencies → add ACL, events, outbox, and distributed coordination only when justified → verify testing and observability checklists.`
-
-## Related skills
-
-- [ddd-core](../../ddd-core/SKILL.md) — language-agnostic DDD rules and aggregate modeling.
-- [data-design](../../../data-design/SKILL.md) — relational schemas, constraints, indexes, and migrations.
-- [http-api-design](../../../software-architecture/http-api-design/SKILL.md) — HTTP semantics, errors, pagination, concurrency, and OpenAPI contracts.
+- [ddd-core](../../ddd-core/SKILL.md) — language-agnostic context mapping, aggregate boundaries, and domain modeling.
+- [http-api-design](../../../software-architecture/http-api-design/SKILL.md) — additional HTTP contract and semantics guidance.
+- [data-design](../../../data-design/SKILL.md) — apply only when relational schema design is actually selected; it does not make relational persistence mandatory here.

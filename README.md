@@ -1,7 +1,7 @@
 # airi
 
 Flake packaging AI coding tools — `claude-code`, `codex`, `antigravity-cli`,
-`pi-coding-agent`, `herdr`, and `mcode` — as reproducible Nix derivations
+`pi-coding-agent`, and `herdr` — as reproducible Nix derivations
 that fetch official prebuilt releases.
 
 The tools are exposed as reproducible flake outputs; each package is sourced
@@ -17,7 +17,6 @@ packages/
   agy/default.nix
   pi/default.nix
   herdr/default.nix
-  mcode/default.nix
 ```
 
 ## Tools
@@ -26,10 +25,9 @@ packages/
 |---|---|---|---|
 | claude-code | `claude` | `claude-code` | |
 | codex | `codex` | `codex` | |
-| antigravity-cli | `agy` | `antigravity-cli` | unfree, `allowUnfree` already set |
+| antigravity-cli | `antigravity` | `antigravity-cli` | unfree, `allowUnfree` already set |
 | pi-coding-agent | `pi` | `pi-coding-agent` | |
 | herdr | `herdr` | — | terminal workspace manager |
-| mcode | `mcode` | — | MiniMax Code CLI; npm-package build (`buildNpmPackage`), better-sqlite3 native binding rebuilt at build time |
 
 ## Build
 
@@ -39,7 +37,6 @@ nix build .#codex
 nix build .#antigravity-cli
 nix build .#pi-coding-agent
 nix build .#herdr
-nix build .#mcode
 nix build .#default   # all tools via symlinkJoin
 ```
 
@@ -50,15 +47,12 @@ nix run .#update-claude-code
 nix run .#update-codex
 nix run .#update-pi-coding-agent
 nix run .#update-herdr
-nix run .#update-mcode          # also regenerates vendored package-lock.json
 nix run .#update-antigravity-cli -- 1.1.14-6068529322131456
 ```
 
 Each updater pulls the latest official release, recomputes the source hash,
 and rewrites the version/hash lines in `packages/<tool>/default.nix` in
-place. For `mcode` an additional `package-lock.json` is regenerated against
-the npm registry; bump `npmDepsHash` with the SRI printed by the first build
-attempt.
+place.
 
 If a release hasn't reached `nixos-unstable` yet, point that input at
 `github:NixOS/nixpkgs/master` in `flake.nix` instead, then relock.
@@ -86,7 +80,7 @@ nix flake update
           environment.systemPackages = [
             airi.packages.${pkgs.system}.claude-code
             airi.packages.${pkgs.system}.codex
-            airi.packages.${pkgs.system}.mcode
+            airi.packages.${pkgs.system}.pi-coding-agent
           ];
         })
       ];

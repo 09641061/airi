@@ -9,10 +9,10 @@ in
     # Client/server publish independently from the CLI, so pin their latest releases.
     "npm:@earendil-works/pi-client@1.1.0"
     "npm:@earendil-works/pi-server@1.1.0"
-    "npm:pi-subagents@0.78.0"
-    "npm:pi-web-access@0.40.0"
-    "npm:pi-mcp-adapter@5.3.0"
-    "npm:@narumitw/pi-lsp@0.49.9"
-    "npm:@narumitw/pi-plan-mode@0.59.2"
+    "npm:pi-subagents@0.80.0"
+    "npm:pi-web-access@0.44.0"
+    "npm:pi-mcp-adapter@5.4.0"
+    "npm:@narumitw/pi-lsp@0.49.10"
+    "npm:@narumitw/pi-plan-mode@0.59.4"
   ];
 }

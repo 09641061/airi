@@ -22,12 +22,18 @@ Constructor injection is enough; a reflection-based DI framework is optional.
 
 ## Reliability and observability
 
-- Use structured logs at request/application/infrastructure boundaries; do not inject loggers into domain values for convenience.
-- Propagate request/correlation and trace context through HTTP, application, ACL, and persistence calls.
+- Use structured logs (`log/slog`) at request/application/infrastructure boundaries; do not inject loggers into domain values for convenience.
+- Propagate request/correlation and trace context through HTTP, application, ACL, and persistence calls, always through `context.Context`.
 - Measure meaningful HTTP and dependency latency/error rates; use OpenTelemetry when tracing/metrics are operationally justified.
 - Configure timeouts and graceful shutdown at process/server bootstrap. Propagate cancellation/deadlines to I/O adapters.
 - Define retries, idempotency, concurrency control, and consistency according to business needs and the actual adapter guarantees.
-- Do not impose SQL transactions, connection pools, or outbox algorithms on technologies with different primitives.
+- Do not impose SQL transactions, connection pools, or delivery infrastructure on technologies that have different primitives.
 - Make infrastructure failures observable without exposing credentials or sensitive domain data.
 
-**Checklist:** settings are validated; only needed dependencies are initialized; cancellation/timeouts propagate; shutdown releases initialized resources; critical retry/concurrency guarantees are explicit; telemetry focuses on useful service-level signals.
+**Checklist**
+
+- [ ] Infrastructure failures are observable without exposing credentials or sensitive domain data.
+- [ ] Cancellation and timeouts propagate to I/O adapters.
+- [ ] Concurrency/retry semantics are explicit for critical operations.
+- [ ] Shutdown releases only those resources actually initialized by the process.
+- [ ] Monitoring focuses on meaningful service-level signals.

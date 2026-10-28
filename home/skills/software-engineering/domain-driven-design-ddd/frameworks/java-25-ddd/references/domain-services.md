@@ -2,25 +2,17 @@
 
 Location: `[context-name]/domain/services/`
 
-Domain services hold **pure business logic** that does not naturally belong to a single entity or value object — typically a policy or calculation that spans several aggregates. They do **not** orchestrate use cases.
+A domain service contains a pure business policy or calculation that does not naturally belong to one entity or value object.
 
-- **Interface first**: domain contracts as Java interfaces, **without Spring/JPA imports**.
-- **Naming Convention**: `*Policy`, `*Calculator`, `*Specification`, or any name from the ubiquitous language. Do **not** use `*CommandService` or `*QueryService` here — those are application-layer concepts and live in `application/internal/`.
-- **No infrastructure**: no `@Service`, no `@Transactional`, no repository dependencies. If a service needs a repository, it is an application service, not a domain service.
-- **Stateless**: holds no state between invocations.
-- **Business focus**: only domain rules; nothing about HTTP, transactions, or persistence.
-
-## What a domain service is NOT
-
-- It is not an application service (those orchestrate use cases; see `application-services.md`).
-- It is not a repository (those persist aggregates; see `infrastructure-repositories.md`).
-- It is not a domain event handler (those consume events asynchronously).
+- **Framework-free:** no Spring, JPA, repositories, HTTP, transactions, or messaging.
+- **Concrete stateless class by default.** Define an interface only when the model needs a genuine policy contract or a substitutable implementation.
+- **Business-language name:** `EnrollmentPolicy`, `EligibilitySpecification`, `PricingCalculator`.
+- **Not `*CommandService` / `*QueryService`:** those belong to application.
 
 ## Checklist
 
-- [ ] Interface defined in `domain/services/`
-- [ ] No `org.springframework.*` or `jakarta.persistence.*` imports
-- [ ] No `*CommandService` / `*QueryService` naming — those belong to the application layer
-- [ ] Methods express business rules in the ubiquitous language
-- [ ] Method returns are domain types or built-in Java types (no DTOs)
-- [ ] Stateless
+- [ ] The rule genuinely does not belong to one entity or value object
+- [ ] Methods express a policy in the ubiquitous language
+- [ ] The type contains no framework, persistence, or I/O dependency
+- [ ] An interface exists only when it provides a meaningful contract
+- [ ] Use-case coordination remains in an application service

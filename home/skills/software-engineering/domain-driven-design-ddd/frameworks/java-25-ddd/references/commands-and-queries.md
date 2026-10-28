@@ -1,39 +1,56 @@
-# Commands & Queries
+# Application Commands & Queries
 
-## Commands
+## Commands. Location: `[context-name]/application/commands/`
 
-Location: `[context-name]/domain/model/commands/`
+A command expresses an intention to change state (`ConfirmEnrollment`, `CreateCourse`). Prefer specific business intent over a generic CRUD patch.
 
-Commands represent intentions to change state and are immutable.
+- **Records** when they fit well.
+- **Specific naming:** `ConfirmEnrollmentCommand`, not `UpdateCommand`.
+- **Validation:** the handler maps input values to domain value objects; the aggregate — not the DTO — enforces the invariants.
 
-- **Naming Convention**: Files end with `Command`
-- **Use Records**: Commands should be records
-- **Specific Naming**: Name by business intent
-- **Validation Ready**: Include all required data
+```java
+// File: [context-name]/application/commands/ConfirmEnrollmentCommand.java
+package com.acme.center.platform.[context].application.commands;
 
-Checklist:
+public record ConfirmEnrollmentCommand(Long enrollmentId) {
+    public ConfirmEnrollmentCommand {
+        if (enrollmentId == null || enrollmentId <= 0) {
+            throw new IllegalArgumentException("Enrollment id must be positive");
+        }
+    }
+}
+```
+
+### Checklist (commands)
+
 - [ ] All commands are records
 - [ ] File names end with `Command`
-- [ ] Specific and descriptive naming
-- [ ] Input validation in constructor
-- [ ] Use value objects for complex types
-- [ ] Include all required operation data
+- [ ] Named after business intent
+- [ ] No business logic inside the command
+- [ ] Located in `application/commands`, not in `domain/model/commands`
 
-## Queries
+## Queries. Location: `[context-name]/application/queries/`
 
-Location: `[context-name]/domain/model/queries/`
+A query requests information and must not mutate state. Its result can be an application read model; it does not need to be a domain aggregate.
 
-Queries request information and must not mutate state.
+```java
+// File: [context-name]/application/queries/CourseSummaryQuery.java
+package com.acme.center.platform.[context].application.queries;
 
-- **Naming Convention**: Files end with `Query`
-- **Use Records**: Queries should be records
-- **Specific Naming**: Name by query intent
-- **Validation**: Validate query constraints
+public record CourseSummaryQuery(Long courseId) {
+    public CourseSummaryQuery {
+        if (courseId == null || courseId <= 0) {
+            throw new IllegalArgumentException("Course id must be positive");
+        }
+    }
+}
+```
 
-Checklist:
+### Checklist (queries)
+
 - [ ] All queries are records
 - [ ] File names end with `Query`
-- [ ] Specific and descriptive naming
-- [ ] Validation for search criteria
-- [ ] Use `Optional` for optional parameters
-- [ ] Include pagination/sorting parameters when needed
+- [ ] Named after query intent
+- [ ] `Optional` for optional parameters
+- [ ] Pagination/sorting only when the use case or the API requires them
+- [ ] An established HTTP contract is never altered as a side effect of a refactor

@@ -1,32 +1,36 @@
-# Testing & Observability
+# Testing and Observability
 
-## Testing Requirements
+## Testing requirements
 
-Tests are split by layer. Mixing them defeats their purpose.
+- **Domain unit tests:** plain JUnit 5 tests for value objects, aggregate invariants, state transitions, and pure domain policies. They must not boot Spring, Hibernate, or a database.
+- **Application tests:** use-case orchestration with contract-faithful fakes or mocks for repositories and outbound ports. Start a Spring context only when proxy or configuration behavior is part of the subject under test.
+- **Infrastructure integration tests:** a real or test database for JPA mappings, SQL behavior, constraints, transaction boundaries, and outbox delivery when those are critical. A Mockito test of `JpaRepository` does not prove those behaviors.
+- **REST/security contract tests:** validation, authorization, serialization, status codes, and the existing HTTP contract with an MVC slice or an appropriate integration test.
+- **Cross-context tests:** the published contract, ACL mapping, consistency timing, duplicate delivery, and the error/retry policy selected by the architecture.
+- **E2E:** reserve for high-value complete workflows; do not make every unit scenario boot the entire platform.
 
-- **Domain unit tests** — value objects, entities, aggregate invariants, domain services, domain events. **Pure JUnit 5 + AssertJ/Mockito. No `@SpringBootTest`, no `@DataJpaTest`, no Hibernate, no JPA, no database.** Domain tests do not even have Spring or Hibernate on the test classpath unless an integration test for the same module needs it. Domain aggregates and value objects are constructed and exercised through their public methods only.
-- **Application unit tests** — command/query services. Plain JUnit + Mockito; the domain repository ports and outbound ACL facades are mocked. **No Spring context, no database.** A `@SpringBootTest` slice for an application service is acceptable only if the orchestration under test genuinely requires Spring's proxy machinery; document it in the test header.
-- **Infrastructure integration tests** — JPA mappings, repository adapters, outbox, ACL adapters. These use a real database (Testcontainers, embedded H2/Postgres) and exercise the JPA layer end-to-end. They are tagged separately (`@Tag("integration")`) and live in `src/test/java/.../infrastructure/` alongside the production code they cover.
-- **REST contract tests** — controllers, resources, transformers, error handlers. `@WebMvcTest` slice, mocked services, no DB.
-- **End-to-end tests** — happy paths across bounded contexts; exercise only what's worth a full deploy.
+### Checklist (testing)
 
-A test is a "unit" only if it runs in milliseconds without external processes. Anything that boots Spring, Hibernate, a database, or a message broker is an integration test, even if the file is named `*Test`.
+- [ ] Aggregate invariants and state transitions have direct domain tests
+- [ ] Application failure paths and orchestration are tested at their ports
+- [ ] Critical mappings, constraints, and transaction behavior are tested against a database
+- [ ] REST validation and authorization are enforced by tests, not only by API documentation
+- [ ] Cross-context event/call consistency and failure behavior are tested
+- [ ] A test that boots Spring, Hibernate, or a database is an integration test, whatever its filename says
 
-Checklist:
-- [ ] Domain unit tests use plain JUnit + AssertJ/Mockito; no Spring/Hibernate/JPA/DB on the classpath
-- [ ] Application unit tests mock the domain ports (repositories, outbound services)
-- [ ] JPA mappings, queries, and constraints are exercised only in infrastructure integration tests with a real database
-- [ ] ACL tests verify timeout, error translation, and unmapped-error handling
-- [ ] Coverage is generated and a quality gate is enforced
+For the Java/Spring testing conventions in depth (fixtures, Testcontainers, mocking style, quality gates), see the dedicated testing skill: [java-tdb](../../../../test-driven-development-tdb/java-tdb/SKILL.md).
 
-## Observability and Reliability
+## Observability and reliability
 
-- Structured logging with trace/correlation identifiers.
-- Metrics for latency, error rate, and throughput.
-- Distributed tracing across bounded contexts.
+- Structured logging with trace/correlation identifiers at external boundaries.
+- **Never log passwords, tokens, secrets, or unnecessary personal data.**
+- Latency, error-rate, and throughput metrics on critical workflows; tracing when the deployment supports it.
 - Idempotency for retry-prone operations.
+- Preserve contract compatibility during architecture refactors.
 
-Checklist:
+### Checklist (observability)
+
 - [ ] Correlation id propagated through inbound/outbound calls
 - [ ] Critical operations instrumented
 - [ ] Alerts for latency and failure rate defined
+- [ ] No credentials or sensitive data in logs

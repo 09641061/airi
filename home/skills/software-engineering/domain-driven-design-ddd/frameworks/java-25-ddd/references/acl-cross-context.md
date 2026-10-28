@@ -1,187 +1,86 @@
-# Anti-Corruption Layer (ACL) — Cross-Context Integration
+# ACL and Cross-Context Communication
 
-Use this whenever a bounded context needs data or operations from another bounded context. **Never call another context's internals directly** — always go through an ACL facade.
+Use a context-owned contract whenever one bounded context needs another's capabilities. An **Anti-Corruption Layer (ACL)** is a consumer-side translation/protection boundary; it is not synonymous with every facade or every in-process method call.
 
-> **Layer reminder (read first).** The facade exposes a public contract in `interfaces/acl/`. Its implementation depends on the provider context's **application** command/query services (`application/internal/...`), never on `domain/services/`. Domain services are pure policies/calculators and are not appropriate as consumers of ACL facades.
+## Dependency direction
 
-## Step 1: Identify Communication Needs
-
-```
-1. What data does Context A need from Context B?
-2. What operations must Context A perform against Context B?
-```
-
-## Step 2: Map Domain Models
-
-```
-Context A (Consumer) Model <-> Context B (Provider) Model
-```
-
-## Step 3: Define ACL Interface Contract
-
-```
-Questions to define:
-1. Which methods does the ACL facade expose?
-2. Which parameters are needed?
-3. Which return types make business sense?
-4. How are failures translated?
-
-Design principle: Keep it simple and focused on consumer needs.
-```
-
-## Implementation in Provider Context (Context B)
-
-**Step 4: Create ACL Facade Interface**
+- The provider exposes a small, stable **application API/input port**, for example `profiles/application/api/ProfilesApi`. Its implementation belongs to the provider's application layer.
+- The consumer expresses the need in its own application layer, for example `learning/application/ports/out/ProfileDirectory`.
+- A consumer-side adapter/ACL implements that need and translates the provider's published types into consumer-owned types. It belongs in `infrastructure` (or the project's clearly defined outbound-adapter package).
+- **Do not** put the provider contract in an outer HTTP/interface-adapter package when the provider application must import and implement it: that reverses the dependency direction.
+- Never import another context's private aggregate, persistence entity, Spring Data repository, or implementation service.
 
 ```java
-// File: [context-b]/interfaces/acl/[ContextB]ContextFacade.java
-package com.acme.center.platform.[contextb].interfaces.acl;
+// Provider: [context-b]/application/api/ProfilesApi.java
+package com.acme.center.platform.[contextb].application.api;
 
 import java.util.Optional;
 
-public interface [ContextB]ContextFacade {
-
-    Optional<Long> create[Entity](String param1, String param2);
-
-    Optional<Long> find[Entity]IdBy[Field](String identifier);
+public interface ProfilesApi {
+    Optional<Long> findProfileIdByEmail(String email);
 }
 ```
 
-**Step 5: Implement ACL Facade**
-
 ```java
-// File: [context-b]/application/acl/[ContextB]ContextFacadeImpl.java
-package com.acme.center.platform.[contextb].application.acl;
+// Consumer port: [context-a]/application/ports/out/ProfileDirectory.java
+package com.acme.center.platform.[contexta].application.ports.out;
 
-import com.acme.center.platform.[contextb].domain.model.commands.Create[Entity]Command;
-import com.acme.center.platform.[contextb].domain.model.queries.Get[Entity]By[Field]Query;
-import com.acme.center.platform.[contextb].application.internal.commandservices.[Entity]CommandService;
-import com.acme.center.platform.[contextb].application.internal.queryservices.[Entity]QueryService;
-import com.acme.center.platform.[contextb].interfaces.acl.[ContextB]ContextFacade;
-import org.springframework.stereotype.Service;
+import com.acme.center.platform.[contexta].domain.model.valueobjects.ProfileId;
 
 import java.util.Optional;
 
-@Service
-public class [ContextB]ContextFacadeImpl implements [ContextB]ContextFacade {
+public interface ProfileDirectory {
+    Optional<ProfileId> findProfileByEmail(String email);
+}
+```
 
-    private final [Entity]CommandService [entity]CommandService;
-    private final [Entity]QueryService [entity]QueryService;
+```java
+// Consumer adapter/ACL: [context-a]/infrastructure/acl/ProfilesModuleAdapter.java
+package com.acme.center.platform.[contexta].infrastructure.acl;
 
-    public [ContextB]ContextFacadeImpl(
-            [Entity]CommandService [entity]CommandService,
-            [Entity]QueryService [entity]QueryService
-    ) {
-        this.[entity]CommandService = [entity]CommandService;
-        this.[entity]QueryService = [entity]QueryService;
+import com.acme.center.platform.[contexta].application.ports.out.ProfileDirectory;
+import com.acme.center.platform.[contexta].domain.model.valueobjects.ProfileId;
+import com.acme.center.platform.[contextb].application.api.ProfilesApi;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
+
+@Component
+public class ProfilesModuleAdapter implements ProfileDirectory {
+    private final ProfilesApi profilesApi;
+
+    public ProfilesModuleAdapter(ProfilesApi profilesApi) {
+        this.profilesApi = profilesApi;
     }
 
     @Override
-    public Optional<Long> create[Entity](String param1, String param2) {
-        var command = new Create[Entity]Command(param1, param2);
-        return [entity]CommandService.handle(command).map(entity -> entity.getId());
-    }
-
-    @Override
-    public Optional<Long> find[Entity]IdBy[Field](String identifier) {
-        var query = new Get[Entity]By[Field]Query(new [Field](identifier));
-        return [entity]QueryService.handle(query).map(entity -> entity.getId());
+    public Optional<ProfileId> findProfileByEmail(String email) {
+        return profilesApi.findProfileIdByEmail(email).map(ProfileId::new);
     }
 }
 ```
 
-## Implementation in Consumer Context (Context A)
+For two modules in the same deployable, a direct call through the provider's public application API may be enough when no semantic translation is required. Add an ACL when it protects the consumer from a foreign model or protocol; do not add a layer that only renames fields.
 
-**Step 6: Create Value Objects in Consumer Context**
+## Events between contexts
 
-```java
-// File: [context-a]/domain/model/valueobjects/[Entity]Id.java
-package com.acme.center.platform.[contexta].domain.model.valueobjects;
+An integration event keeps its contract separate from the provider's internal domain event and includes only what consumers need. A synchronous in-process Spring event is neither durable nor automatically asynchronous: when delivery must survive process failure, write the outbox record in the same transaction as the state change and publish it through a retrying relay (at-least-once delivery means idempotent consumers).
 
-public record [Entity]Id(Long [entity]Id) {
-    public [Entity]Id {
-        if ([entity]Id == null || [entity]Id <= 0) {
-            throw new IllegalArgumentException("[Entity] ID must be a positive number");
-        }
-    }
-}
-```
+## Common pitfalls to avoid
 
-> The domain value object has **no** JPA annotation. If the consumer context persists the foreign reference, define a JPA-side embeddable in `infrastructure/persistence/jpa/embeddables/[Entity]IdEmbeddable.java` and map it explicitly. Do not put `@Embeddable` on the domain class.
+1. **Do not expose complex domain objects** — use minimal ACL contracts.
+2. **Do not create circular dependencies** — keep the direction explicit.
+3. **Do not skip error translation** — map external errors to consumer-level errors.
+4. **Do not use sentinel values** — use `Optional`/typed errors, never `0L` as "not found".
+5. **Do not tight-couple contexts** — integrate through the contract, never by calling an internal implementation directly.
+6. **Do not add an outbox without a need** — only when durable delivery is a requirement.
 
-**Step 7: Create External Service (ACL Layer)**
+## Checklist
 
-```java
-// File: [context-a]/application/internal/outboundservices/acl/External[Entity]Service.java
-package com.acme.center.platform.[contexta].application.internal.outboundservices.acl;
-
-import com.acme.center.platform.[contexta].domain.model.valueobjects.[Entity]Id;
-import com.acme.center.platform.[contextb].interfaces.acl.[ContextB]ContextFacade;
-import org.springframework.stereotype.Service;
-
-import java.util.Optional;
-
-@Service
-public class External[Entity]Service {
-
-    private final [ContextB]ContextFacade [contextb]ContextFacade;
-
-    public External[Entity]Service([ContextB]ContextFacade [contextb]ContextFacade) {
-        this.[contextb]ContextFacade = [contextb]ContextFacade;
-    }
-
-    public Optional<[Entity]Id> fetch[Entity]By[Field](String [field]) {
-        return [contextb]ContextFacade
-                .find[Entity]IdBy[Field]([field])
-                .map([Entity]Id::new);
-    }
-
-    public Optional<[Entity]Id> create[Entity](String param1, String param2) {
-        return [contextb]ContextFacade
-                .create[Entity](param1, param2)
-                .map([Entity]Id::new);
-    }
-}
-```
-
-**Step 8: Update Command Services (Integration in Consumer Context)**
-
-```java
-// File: [context-a]/application/internal/commandservices/[ConsumerEntity]CommandServiceImpl.java
-
-private final External[Entity]Service external[Entity]Service;
-
-public [ConsumerEntity]CommandServiceImpl(
-        [ConsumerEntity]Repository repository,
-        External[Entity]Service external[Entity]Service
-) {
-    this.repository = repository;
-    this.external[Entity]Service = external[Entity]Service;
-}
-
-@Override
-public [ConsumerEntity]Id handle(Create[ConsumerEntity]Command command) {
-    var [entity]Id = external[Entity]Service.fetch[Entity]By[Field](command.[field]())
-            .or(() -> external[Entity]Service.create[Entity](command.param1(), command.param2()));
-
-    var resolvedId = [entity]Id.orElseThrow(() ->
-            new IllegalStateException("Unable to create/fetch external entity"));
-
-    repository.findBy[Entity]Id(resolvedId).ifPresent(existing -> {
-        throw new IllegalArgumentException("Duplicate entity found");
-    });
-
-    var [consumerEntity] = new [ConsumerEntity](resolvedId);
-    repository.save([consumerEntity]);
-    return [consumerEntity].getId();
-}
-```
-
-## Common Pitfalls to Avoid
-
-1. **Do not expose complex domain objects** — use simple ACL contracts.
-2. **Do not create circular dependencies** — keep direction explicit.
-3. **Do not skip error translation** — map external errors to domain-level errors.
-4. **Do not skip testing** — include ACL contract and integration tests.
-5. **Do not tight-couple contexts** — always integrate through ACL, never direct internal calls.
-6. **Do not use sentinel values** — use `Optional`/typed errors, never `0L` as not-found.
+- [ ] The provider owns the public application contract
+- [ ] The consumer expresses its need through a consumer-owned outbound port when useful
+- [ ] The ACL translates semantics rather than merely renaming fields
+- [ ] No provider persistence or private domain types cross the boundary
+- [ ] Absence and failure are represented explicitly, never by sentinels
+- [ ] Synchronous call, local event, or durable outbox is chosen according to consistency and reliability requirements
+- [ ] Contract, mapping, error, and retry behavior are tested at the relevant boundary

@@ -1,65 +1,65 @@
-# Testing Requirements
+# Testing — Scope, Placement, and Executed Evidence
 
-Tests are executable specifications of business behavior and public contracts — not demonstrations that mocks can return prearranged values.
+Source: guide §13. Tests specify business behavior and public contracts, not demonstrations of configured mock returns. Add them throughout each vertical slice and before moving behavior in a refactor.
 
-## Test by boundary
+## Select the boundary and evidence
 
-- **Domain unit tests:** use real Value Objects, Entities, Aggregates, and Domain Services. Cover invariants, valid/invalid transitions, boundary conditions, event correctness, rule-required idempotency, and unchanged state after rejected operations.
-- **Application unit tests:** use small fakes/stubs for repository or ACL ports only where needed to control boundary outcomes. Assert business-visible results and forbidden side effects; avoid tests that only assert arbitrary call counts.
-- **Persistence integration/contract tests:** exercise the actual selected engine. Verify mapping, uniqueness, consistency, concurrency, and driver-specific error handling. An in-memory fake is not proof of production-engine semantics.
-- **REST tests:** use Gin and `httptest` for binding, validation, response/status mapping, and request cancellation propagation.
-- **Cross-context tests:** verify ACL translations, public provider contracts, missing data, failures, and timeouts.
+| Scope | Use and assert | Location |
+|---|---|---|
+| Domain unit | Real values/aggregates/policies; valid, invalid, zero-value and boundary inputs, transitions, unchanged state/events after rejection | Beside the domain code |
+| Application unit | Real domain objects and small port fakes; outcomes, persistence state, failure propagation and forbidden side effects | Beside the use case |
+| REST/message unit | Binding/envelope validation, mapping, safe errors, delegation/cancellation with controlled dependencies | Beside the inbound adapter |
+| Persistence integration | Actual selected engine, mappings, migrations, constraints, atomicity, concurrency, driver errors | `/test/integration/[context-name]/persistence/` |
+| HTTP/message/ACL integration | Real dependencies and compatibility at the relevant boundary | `/test/integration/[context-name]/rest/`, `events/`, or `acl/` |
+| E2E | Few critical full-system journeys through public boundaries | `/test/e2e/[context-name]/` or `/test/e2e/journeys/` |
 
-## Go test idioms
+## Organize idiomatically
 
-- **Table-driven tests:** express scenarios that share setup as a table of cases and run each with `t.Run(name, ...)`, so a failure reports the case that broke instead of a line number.
-- **Assertion helpers:** mark helper functions with `t.Helper()` so the reported line is the caller's.
-- **Golden files:** keep expected payloads under `testdata/` and compare with `os.ReadFile` when the exact output matters.
-- **Static checks:** run `go vet ./...` (plus `staticcheck` when the project uses it) as part of the quality gate.
+- Unit tests use `*_test.go` beside production packages, grouped by feature/behavior/responsibility. Several test files may exercise one aggregate; no mandatory one-to-one source/test pairing.
+- Prefer an external test package for public contracts where suitable; use the production package when internal-state assertions are justified. A package name declared in another directory does not grant unexported access.
+- Root `/test` suites import accessible APIs. Account for nested `internal/` restrictions before relocating them. Do not export implementation details solely for tests or create a second module without a real lifecycle need.
+- `httptest` with a fake use case can be unit-level; HTTP with real storage is integration. Test tools do not determine scope.
+- Put fixture/golden files in suite-local `testdata/`; share helpers only across real consumers. No automatic test resources/transport directory mirror.
+- Name behaviors clearly; use `t.Run` tables for equivalent partitions, not unrelated scenarios buried in a giant table. Mark helpers with `t.Helper()`.
+- Review test files exceeding 150 physical lines by scenario/responsibility, retaining a cohesive suite with rationale rather than arbitrary fragmentation.
 
-```go
-func TestEnrollmentConfirm(t *testing.T) {
-	cases := []struct {
-		name    string
-		status  Status
-		wantErr error
-	}{
-		{name: "confirms pending", status: StatusPending},
-		{name: "rejects confirmed", status: StatusConfirmed, wantErr: ErrAlreadyConfirmed},
-	}
+## Make tests sensitive to regressions
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			e := &Enrollment{id: "e-1", status: tc.status}
-			err := e.Confirm()
-			if !errors.Is(err, tc.wantErr) {
-				t.Fatalf("Confirm() error = %v, want %v", err, tc.wantErr)
-			}
-		})
-	}
-}
+Use real domain objects, not mocks of value objects, entities, aggregates, pure policies, or the SUT. Assert meaningful successful, rejected, and boundary outcomes; coverage and `NoError` alone are insufficient. Verify interactions only when the absence/duplication of that effect would violate a contract.
+
+Fakes must honor absence/conflict and aliasing semantics. A mutex around a map does not protect returned mutable pointers/slices. Copy state where the port requires isolation; do not let shared references accidentally persist failed mutations. A fake cannot prove database rollback or concurrency control.
+
+Control clocks/IDs when relevant. Keep tests order-independent and avoid real external I/O in unit tests. For storage, use the actual selected production engine rather than assuming SQLite or memory proves another engine's guarantees. Container tooling is optional, not a mandatory technology choice.
+
+## Execute suites explicitly
+
+Tag integration files with `//go:build integration` and E2E files with `//go:build e2e`, followed by a blank line before `package`. CI must provision dependencies and execute each required tag. For the illustrative single-module layout:
+
+```bash
+# Fast unit checks; extend paths for other production packages if present
+go test ./internal/... ./cmd/...
+go test -race ./internal/... ./cmd/...
+go vet ./...
+
+# Actual storage/boundary guarantees
+go test -tags=integration -count=1 ./test/integration/...
+
+# Running system and critical flows
+go test -tags=e2e -count=1 ./test/e2e/...
 ```
 
-## Quality guidance
+Adapt package paths to the actual repository; do not present nonexistent packages as executed checks. `go test ./...` does not run tagged suites without tags. Missing dependencies are a reported verification gap, not grounds to silently skip critical CI coverage.
 
-- Test meaningful positive, negative, and boundary cases for critical domain rules.
-- Do not mock Value Objects, Entities, Aggregates, Domain Services, or the system under test.
-- Rejected commands must not partially mutate aggregates or emit success events.
-- Prefer observable outcomes and stable public contracts over implementation details.
-- Treat coverage as an inspection aid, not proof of correctness.
-- Use `go test ./...` and `go test -race ./...`; inspect targeted coverage. Add native fuzz tests for suitable parsers/invariants.
-- Keep tests deterministic, and control clocks/IDs when they affect behavior.
+Inspect targeted coverage; external suites may need `-coverpkg` for production packages. Add native fuzz tests for suitable parsers/invariants and project-adopted static checks where available. Do not invent a universal coverage percentage or claim the race detector proves absence of all races.
 
-Testing frameworks, test databases, containers, and external test tools should follow the selected technology and project constraints; no particular engine or library is mandatory.
+For failures, report the command, relevant output, and infrastructure/tooling prerequisites. For tagged suites, confirm actual execution rather than merely compiling their helpers. Real-engine tests should cover commit/rollback, optimistic or lock-based concurrency, cancellation, and state/outbox atomicity when applicable.
 
-For the Go testing conventions in depth (fixtures, fakes, integration setup, CI gates), see the Go testing skill: [go-tdb](../../../../test-driven-development-tdb/go-tdb/SKILL.md).
+## Compatibility with the separate testing skill
 
-## Checklist
+The linked [go-tdb](../../../../test-driven-development-tdb/go-tdb/SKILL.md) remains a separate, unsynchronized document. It is **not a prerequisite or architectural authority** for this skill. Its domain/repositories placement, type-category domain tree, PostgreSQL/Koanf/YAML baseline, or other incompatible paths must not be imported as defaults here.
 
-- [ ] Critical domain invariants have positive, negative, and boundary tests.
-- [ ] No mocks for Value Objects, Entities, Aggregates, or the system under test.
-- [ ] Rejected commands do not partially mutate aggregates or emit success events.
-- [ ] Repositories are tested using the selected real persistence technology.
-- [ ] Tests verify outcomes and public contracts, not arbitrary call counts.
-- [ ] Coverage numbers are not treated as proof of correctness.
-- [ ] Scenarios that share setup are expressed as named table-driven cases.
+Its testing techniques may be consulted selectively only where compatible with the guide's consumer-owned ports, technology neutrality, and test placement. If both skills are requested and conflict, identify the contradiction explicitly and obtain a decision before changes that would alter those contracts; do not silently blend their structures. Updating this skill does not claim to repair that external document.
+
+## Delivery evidence
+
+Report checks run, passed/failed results, skipped checks with reasons, and residual risks. Keep repository tests separate from temporary snippet/syntax validation. A passing fake/unit suite must never be reported as successful database integration or E2E verification.

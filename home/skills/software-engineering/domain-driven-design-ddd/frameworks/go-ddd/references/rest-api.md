@@ -1,59 +1,48 @@
-# REST Resources and Gin Controllers
+# REST and Inbound Events — Adapt, Then Delegate
 
-Gin is the HTTP adapter. Keep public HTTP shapes and transport concerns at the transport boundary, separate from domain models and application contracts. The inbound boundary is `transport/http/`, not `interfaces/`: Go calls it *transport*, and a directory named after a layer type groups code by kind rather than by feature.
+Source: guide §11. Gin is confined to REST/HTTP adaptation and applicable middleware/composition. Application/domain do not accept `*gin.Context` or transport resources.
 
-## REST resources (DTOs)
+## Place by feature and responsibility
 
-Location: `[context-name]/transport/http/resources/`
+Use `internal/[context-name]/interfaces/rest/` for REST endpoints over HTTP. For a small boundary, related handler, resources, and mapping can share one file. Introduce a feature package only when useful:
 
-- Define request/response structs with `json` and, where appropriate, Gin binding tags in this boundary layer.
-- Keep transport/input validation distinct from domain invariants. Binding validation cannot replace domain checks.
-- Map explicitly between HTTP resources, application contracts, and results. Avoid reflection-based generic mappers unless a concrete need justifies one.
-- Describe required/optional fields and success/error schemas in OpenAPI 3.1; keep public contracts stable as the domain evolves.
-
-**Checklist**
-
-- [ ] HTTP DTOs remain in the REST boundary.
-- [ ] No HTTP tags pollute domain types.
-- [ ] Public API contracts remain stable despite domain refactoring.
-- [ ] OpenAPI describes validation and error responses accurately.
-
-## Controllers
-
-Location: `[context-name]/transport/http/handlers/`
-
-- Import Gin only in HTTP controllers (and applicable HTTP middleware/bootstrap).
-- Bind and validate a request, create a Command or Query, invoke an application use case with `c.Request.Context()`, then map the result explicitly.
-- Keep handlers small: no domain invariants, persistence access, or cross-context orchestration.
-- Translate typed/application errors to the documented HTTP status and response with `errors.Is`/`errors.As`, without leaking sensitive internal details.
-- Register routes at startup and document relevant success, validation, authorization, conflict, absence, and server-error responses in OpenAPI.
-
-```go
-func (h *Handler) CreateCourse(c *gin.Context) {
-    var req resources.CreateCourseRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        writeError(c, http.StatusBadRequest, err)
-        return
-    }
-    result, err := h.useCases.Create(c.Request.Context(), application.CreateCourseCommand{
-        Name: req.Name,
-    })
-    if err != nil {
-        writeError(c, http.StatusInternalServerError, err)
-        return
-    }
-    c.JSON(http.StatusCreated, resources.CourseResource{ID: result.ID, Name: result.Name})
-}
+```text
+interfaces/rest/
+  routes.go
+  enrollment/
+    create.go
+    create_test.go
+    resources.go                 # optional related resources
+    mapping.go                   # optional nontrivial transformation
 ```
 
-## HTTP tests and review
+`resources/` and `transform/` are valid optional subpackages, not mandatory steps in every request. Keep them feature-owned when extracted; avoid generic assembler frameworks, interfaces for simple copies, or one package per DTO. Do not add a redundant transport wrapper. `interfaces` is not a keyword. HTTP probes need not be modeled as REST resources.
 
-Use Gin with `net/http/httptest` to verify request parsing, validation, status/error translation, and cancellation propagation. Cover applicable success, invalid input, absence, conflict, and server-error paths. Do not require a real network server for controller contract tests.
+## Implement a REST operation
 
-**Checklist**
+1. Confirm the existing route/method, request/response shape, statuses, and applicable OpenAPI 3.1 contract before refactoring.
+2. Bind input with bounded request sizes, safe parsing failures, and structural validation. Put JSON/Gin binding tags on resources here, not domain objects.
+3. Construct an application input without passing transport types into the core.
+4. Invoke the use case with `c.Request.Context()`; no database calls, domain invariants, or cross-context workflow in the handler.
+5. Translate errors using `errors.Is`/`errors.As` and the published contract. Known absence/conflict/validation/authorization outcomes must not all become 500. Unexpected failures use a safe public response and appropriate observability.
+6. Map the successful result explicitly to the public resource/status. A small local function or struct construction is enough unless transformation complexity warrants extraction.
 
-- [ ] Gin imports are restricted to the HTTP boundary.
-- [ ] Controller delegates application work.
-- [ ] Request and response mapping is explicit.
-- [ ] HTTP errors and status codes follow published contracts.
-- [ ] `httptest` covers success, validation, absence, conflict, and server error paths where applicable.
+Authentication/middleware implements HTTP mechanics; application/domain keep the authorization rules they respectively own. Preserve routes, payloads, statuses, and error schemas during architectural moves. Do not blindly impose a new status or error format on an existing API.
+
+## Consume incoming messages
+
+Location: `internal/[context-name]/interfaces/events/`.
+
+- Decode/validate envelopes and payloads; interpret delivery identity and metadata.
+- Adapt the message to an application command and propagate available context/deadlines.
+- Delegate business behavior to application; a message callback is not a domain service.
+- Ack only after the required durable processing succeeds. Define failure retry, duplicate handling, poison-message/dead-letter behavior, and cancellation according to the broker contract.
+- Define domain event types with their aggregate, not in this delivery package. Outbound publication belongs in infrastructure.
+
+Durable delivery, deduplication, and transaction coordination require explicit design; see [persistence](persistence.md) and [context integration](context-integration.md). An inbound ACL can live under `interfaces/acl/` only for actual model/contract translation; it is not an obligatory facade.
+
+## Verify at the correct scope
+
+Co-locate unit-level Gin/`httptest` tests with the handler. Cover success, malformed input, relevant absence/conflict/authorization/rejection, safe server-error output, resource mapping, and cancellation. A real network server is not necessary for these tests.
+
+HTTP plus real storage is integration under `/test/integration/[context-name]/rest/`; incoming-message integration goes under the corresponding `events/` responsibility. Test full system journeys under `/test/e2e`. A tool such as `httptest` does not determine test scope; dependencies and guarantees do. See [testing](testing.md).

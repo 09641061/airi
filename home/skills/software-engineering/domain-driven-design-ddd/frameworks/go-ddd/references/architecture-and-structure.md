@@ -1,58 +1,86 @@
-# Architecture and Structure
+# Architecture and Structure — Placement Decisions
 
-This reference defines the boundaries a Go bounded context must preserve. Example paths are conventions, not a required project tree. Use descriptive business names and keep each module independently understandable.
+Source: guide introduction, core rules, placement conventions, and §17. Apply to every bounded context. These are project conventions, not folder names mandated by Go or DDD.
 
-## Naming
+## Inspect before restructuring
 
-Use descriptive role-based names for contracts and technology-based names for concrete implementations. Exported Go identifiers use `PascalCase`, unexported identifiers use `camelCase`, and filenames use descriptive `snake_case.go`. For example, `CourseRepository` is a business port; `PostgresCourseRepository` identifies an implementation technology when that distinction helps. These are naming examples, not required technologies.
+Identify module/workspace boundaries, declared package names, import cycles, public APIs, generated files, and existing tests. Classify files by their actual responsibilities, not by their current directory labels. Use Go mixed caps with initialisms (`CourseID`, `courseID`, `HTTP`, `URL`) and descriptive `snake_case.go` filenames; avoid package-name stuttering and cosmetic renames of stable APIs.
 
-## Dependency and ownership rules
+## Dependency decisions
 
-1. **Domain independence:** `domain/` must not import Gin, persistence clients, configuration libraries, HTTP packages, or another bounded context's private domain types.
-2. **Ports are consumer-side contracts:** the consumer declares the narrow interface it needs; the adapter satisfies it implicitly. No `implements` keyword, no base interface to inherit.
-3. **Application direction:** `application/` depends on domain contracts, never concrete persistence adapters or `*gin.Context`.
-4. **Boundary models:** HTTP, ACL, and messaging DTOs stay at their boundaries. Translate explicitly when models cross a boundary; do not create a generic domain mapper framework.
-5. **Persistence mapping:** SQL rows, ORM/document models, serialization compromises, and storage-specific tags stay in adapters, not domain types.
-6. **No forced abstraction:** do not declare an interface before there is a real usage of it. Accept interfaces, return concrete types. Constructor injection is sufficient; reflection-based DI is optional.
-7. **Aggregate consistency:** enforce invariants in domain objects. Coordinate persistence and transactions at application/infrastructure boundaries when required; do not assume storage engines share transaction guarantees.
-8. **Transport as the inbound adapter:** HTTP handlers, request/response resources, and HTTP error translation live in `transport/http/` (or `api/http/`). Infrastructure holds persistence, security/framework configuration, messaging, and outbound adapters.
-9. **Context boundaries:** integrate through published contracts and an ACL when translation is needed. Do not access another context's private tables, collections, repositories, or domain packages.
-10. **Shared Kernel discipline:** a Shared Kernel is a small, intentionally co-owned set of domain concepts and invariants — not a technical-helper package. Create it only by explicit context-mapping agreement.
-11. **Technical runtime concerns:** configuration, clients, observability, and process setup are technical concerns. Do not impose a generic `platform/` package or a configuration/database convention.
-12. **Public contracts:** document applicable success, validation, authorization, conflict, absence, and server-error responses in OpenAPI.
-13. **Understandable modules:** shared code must reduce real duplication without obscuring responsibility or creating hidden context dependencies.
-14. **Errors and context:** sentinel or typed errors matched with `errors.Is`/`errors.As`; `context.Context` is the first parameter of any I/O function, never stored in a struct, never `nil`.
-15. **Package cohesion:** keep an aggregate with its value objects, states, events, and invariants in one cohesive package.
+| Boundary | Put here | Reject here |
+|---|---|---|
+| `domain/` | Cohesive aggregates, value objects, invariants, policies, optional domain facts | Gin/HTTP, drivers, configuration, logging frameworks, bootstrap, another context's private model |
+| `application/` | Use-case inputs/results, orchestration, consumed ports, published application API | Concrete adapters, transport DTOs, engine transactions, aggregate invariants duplicated in handlers |
+| `infrastructure/` | Persistence/mapping, outbound clients, publishers, transaction mechanics | Inbound handlers or business policy |
+| `interfaces/rest/` | REST resources, binding, handlers, safe HTTP error mapping | Queries to storage, invariants, cross-context orchestration |
+| `interfaces/events/` | Message decoding/envelopes, delivery metadata, delegation and ack/nack | A business workflow hidden in a message callback |
+| `bootstrap/` | Dependency construction and process lifecycle | A globally accessible service locator or business dependency |
 
-## Illustrative placement
+Application consumes domain behavior and narrow ports; adapters depend inward. Constructors normally return concrete implementations. An interface is justified by a real consumer, not the mere existence of a struct.
+
+`interfaces` is not a keyword. Use `interfaces/rest/` here; other projects can legitimately call the HTTP boundary differently. Do not wrap the same endpoints in redundant `interfaces/rest/transport/` layers. Health probes are HTTP mechanics, not necessarily REST resources.
+
+## Illustrative module-root layout
 
 ```text
 cmd/api/main.go
-internal/bootstrap/                              # optional composition root
-internal/shared/infrastructure/config/           # only if configuration reuse is justified
-internal/shared/infrastructure/persistence/[technology]/ # optional shared client factory
-internal/shared/infrastructure/observability/    # optional shared telemetry setup
-internal/[context-name]/domain/                  # cohesive package per aggregate/subdomain
-internal/[context-name]/application/             # use-case contracts and orchestration
-internal/[context-name]/infrastructure/persistence/[technology]/
-internal/[context-name]/transport/http/          # inbound HTTP boundary
+internal/
+  bootstrap/                         # optional; split wiring by context if useful
+  enrollments/
+    domain/enrollment/
+      enrollment.go
+      confirmation.go
+      confirmation_test.go
+    application/
+      confirm_enrollment.go          # input/result, consumed port, handler
+      confirm_enrollment_test.go
+    infrastructure/
+      persistence/postgres/
+        enrollment_repository.go
+        sqlc/                        # optional generated code
+      students/                      # outbound integration owned by consumer
+    interfaces/
+      rest/
+        routes.go
+        confirm_enrollment.go
+        confirm_enrollment_test.go
+      events/                        # optional incoming messages
+      acl/                           # optional inbound adaptation, not outbound calls
+  shared/                            # optional focused capabilities only
+    observability/
+    httpmiddleware/
+test/
+  integration/enrollments/persistence/
+  integration/enrollments/rest/
+  e2e/enrollments/
+  e2e/journeys/
 ```
 
-Do not create all these directories by default. A context may omit layers it does not need. Keep context-owned repositories in the owning context even when a shared technical client factory is used.
+Create only directories needed by the slice. A small cohesive domain may use one package; larger contexts group related concepts by aggregate/subdomain, not global entities/valueobjects/events buckets. Application can grow into feature packages such as `application/confirmation/` when each has a meaningful API. Do not let a feature import a parent facade that already imports it.
 
-## Naming the inbound boundary
+## Split, move, merge, or remove
 
-Go calls the inbound boundary *transport* (`net/http`). `interface` is both a Go keyword and an overloaded term, and a directory named after a layer type groups code by kind rather than by feature — a cohesion and navigation problem the Go community consistently flags. Use `transport/http/` (or `api/http/`) consistently.
+Review every hand-written Go file exceeding **150 physical lines**, including tests. Decide from responsibilities and reasons to change, not line count alone. Record the proposed action or a short retention rationale in the change/review.
 
-## Package cohesion
+| Action | Apply when |
+|---|---|
+| Split a file in the same package | Distinct behaviors, adapter query/mapping responsibilities, or test scenario groups can be navigated independently |
+| Move a file | Its ownership and dependencies belong to another boundary |
+| Extract a package | A cohesive capability needs its own API/encapsulation, not merely fewer lines |
+| Merge files | Small declarations are inseparable and change together, such as a use-case input/result |
+| Delete | Code is dead, scaffolding empty, an interface unused, or a wrapper/mapper adds no boundary |
+| Retain a larger file | Fragmentation would obscure one cohesive responsibility; document why |
 
-A Go package is the unit of cohesion and encapsulation, not a folder that mirrors a file type. Keep an aggregate with its value objects, states, events, and invariants in one cohesive package; split only when a real boundary requires it. Splitting a model into one package per file type creates import cycles, navigation cost, and ceremony without a benefit.
+Do not use numbered parts, one package per declaration, unrelated loose context-root files, or saturated generic service files. Local `errors.go`, resources, and mapping files are valid when cohesive. `resources/`, `transform/`, commands, and query/service subpackages are optional; preserve useful existing divisions. Never fragment generated/vendor code to meet this threshold: change generator inputs and regenerate.
 
-`internal/` is Go's visibility mechanism — packages under it are importable only from the subtree that contains them, which is how a bounded context keeps its internals private. Avoid a top-level `pkg/` directory unless the module publishes a reusable library; it is an outdated convention that adds an import path prefix without adding a boundary.
+## Encapsulation and shared code
 
-## Shared infrastructure is not a Shared Kernel
+- Top-level `internal/` restricts outside imports but **not sibling-context imports**. Enforce published-API-only cross-context imports through review and an import allowlist/check. Never access another context's private model, repositories, or tables.
+- Nested `internal/` can strengthen boundaries, but root `/test` access must be designed first. A declared package name in another directory does not grant private access. `pkg/` adds no visibility boundary and is neither required nor inherently wrong.
+- Keep aggregate internals private; do not export fields to compensate for unnecessary package fragmentation.
+- Admit shared code only with actual compatible consumers, an owner, and a stable contract. Prefer focused `shared/observability`, `shared/httpmiddleware`, or client-factory packages, not generic helpers. Focused packages directly under `internal/` are also valid.
+- A shared client does not imply shared repositories/data ownership. Process-specific configuration can remain in bootstrap.
+- A Shared Kernel is explicitly co-owned domain meaning with governance and compatibility tests; never infer it from similar names. See [context integration](context-integration.md).
 
-- `internal/shared/infrastructure/` is optional technical reuse: configuration loading, observability initialization, HTTP middleware, or a client factory that multiple contexts genuinely use. It contains no business rules.
-- `internal/shared/kernel/` is optional domain code for a narrowly defined set of concepts and invariants that contexts explicitly agree to co-own. It is not the default home for common-looking types.
-- Similar names do not guarantee shared meaning. Contexts may model similarly named concepts differently.
-- Sharing a client does not share a repository or grant another context access to a context's data.
+Deliver an import map and file-action inventory when auditing. Treat directory changes as justified migrations, not evidence by themselves of architectural improvement.

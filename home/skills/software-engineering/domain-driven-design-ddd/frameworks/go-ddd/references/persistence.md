@@ -1,121 +1,67 @@
-# Repository Ports and Persistence Adapters
+# Persistence — Contracts, Mapping, and Atomicity
 
-A Repository exposes the persistence operations required by an aggregate's model. In Go the interface is a **consumer-side contract**: the consumer declares the small set of operations it needs and the adapter satisfies it implicitly — there is no `implements` clause and no base interface to extend.
+Source: guide §§7, 10; event lifecycle in §6. The guide contains the illustrative versioned repository, PostgreSQL conditional-write helper, and transaction-provider templates. Adapt their contracts together rather than copying fragments with undeclared types.
 
-## Placement and contracts
+## Specify the consumed contract
 
-- Port: the package that consumes it, typically `[context-name]/application/`.
-- Adapter: `[context-name]/infrastructure/persistence/[technology]/`.
-- When domain behavior itself needs a collaborator (an aggregate that must load a child collection), the domain package declares its own narrow interface — the domain is then the consumer, and the same rule applies.
-- A repository persists/reconstructs an aggregate according to its port. Do not add generic CRUD methods merely for symmetry, and do not add a repository for an entity without invariants of its own.
-- Multiple technologies may implement the same port only when they satisfy its consistency, absence, and query semantics.
+Before implementing an adapter, document:
 
-```go
-// internal/[context-name]/application/ports.go
-package application
+| Concern | Required decision |
+|---|---|
+| Ownership | Which use case/domain policy consumes the port and declares its operations? |
+| Shape | Aggregate persistence, simple store, or focused read projection? |
+| Absence | Explicit not-found error by default for singular lookups; any optional-result alternative must be documented |
+| Concurrency | Expected-version conditional write, locking, or another engine-supported guarantee? |
+| Atomicity | Which state changes/messages must commit together? |
+| Retries | Which failures are retried, by whom, with what limit/cancellation behavior? |
+| Compatibility | Which stored representations and historical states can be reconstructed? |
 
-import (
-    "context"
-    "<module>/internal/<context-name>/domain"
-)
+Use `internal/[context-name]/infrastructure/persistence/[technology]/` for implementations. Ports normally belong beside consuming application code; a genuinely consuming domain policy can own its narrow collaborator. Do not inject repositories into aggregates just to lazy-load children. A focused CRUD/read port does not require an invented rich aggregate or generic repository hierarchy.
 
-// CourseRepository is the port the use cases need. The concrete adapter in
-// infrastructure/persistence/[technology] satisfies it implicitly.
-type CourseRepository interface {
-    Save(ctx context.Context, course *domain.Course) error
-    FindByID(ctx context.Context, id domain.CourseID) (*domain.Course, error)
-}
-```
+## Implement the adapter boundary
 
-The example is a template until its module path and domain types are replaced.
+- Keep rows, document schemas, ORM tags, driver types, and mappings inside the adapter. Reconstitute the domain deliberately; never reset identity/time or emit creation events while reading.
+- Do not leak sqlc `DBTX`, `Queries`, `Querier`, pgx, SQL, or ORM types through the consumed port. Generated contracts are technical implementation details, not automatically application ports.
+- Constructors normally return concrete types; methods follow their port's result contract. A package such as `postgres` already identifies the implementation technology.
+- Pass request context through begin/query/write operations where APIs support it; translate driver errors into owned port outcomes.
+- Share a technical client factory only for real compatible consumers. Repositories, schema access, and mappings remain context-owned.
+- Soft delete, database defaults, and read-after-write are decisions driven by lifecycle/engine needs, not universal DDD rules. A read-after-write alone does not prevent lost updates.
+- Review adapter files over 150 lines by responsibility. Generated output/vendor is excluded from manual splitting; update SQL/schema/generator settings and regenerate reproducibly.
 
-## Adapter rules
+## Select a consistency mechanism
 
-```text
-internal/[context-name]/infrastructure/persistence/[technology]/
-    course_repository.go
-```
+| Situation | Candidate and required check |
+|---|---|
+| Single aggregate, optimistic concurrency | Read an expected version and compare it atomically on update while incrementing the stored version |
+| Single aggregate, lock-based update | Load/change/write under the engine's actual lock/transaction; document callback retry behavior |
+| Several repositories need one atomic operation | A narrow provider supplies explicitly transaction-bound capabilities to the application callback |
+| Engine lacks the requested atomic primitive | State the limitation and obtain a business/coordination decision; do not promise SQL semantics |
 
-- Name the implementation for its technology when useful, for example `PostgresCourseRepository`. The adapter returns concrete types, not interfaces.
-- Keep SQL rows, ORM models, document schemas, tags, and storage mapping inside the adapter.
-- Translate driver/storage errors to the port's contract. Define absence (`ErrCourseNotFound`), conflicts, and optimistic-concurrency behavior explicitly; never use sentinel values such as `0` for absence.
-- Pass `context.Context` through I/O operations and honor cancellation and deadlines.
-- Test the adapter against the actual selected persistence engine for mapping, constraints, concurrency, and engine-specific behavior.
-- A shared infrastructure package may create a technical client/factory used by multiple contexts when there is genuine reuse. Aggregate repositories remain in their owning contexts; do not put them in `shared/` merely because contexts use the same database or client.
+For versioned SQL writes, handle both execution errors and `RowsAffected()` errors. Zero affected rows may mean stale version or absence; define whether those are one conflict outcome or require stronger differentiation under concurrency. Transaction-local version tokens/results are provisional until successful commit.
 
-## Transactions and Unit of Work
+## Implement transaction binding, not just a named interface
 
-Transactions are a technical guarantee of a specific storage engine, not a domain concept. Keep them in the adapter and out of the use case.
+Application declares the required consistency; the adapter owns the concrete handle. A provider must:
 
-- **Do not pass `*sql.Tx` (or any engine transaction handle) into application logic.** Use cases call ports; adapters decide how a write is made atomic.
-- **Default — the adapter owns the transaction:** the adapter loads the aggregate, applies the change, and commits or rolls back within one call. A relational implementation typically does this with `SELECT ... FOR UPDATE` inside a transaction.
-- **When two repositories must share one transaction,** expose a small transaction-provider port to the application layer and let the adapter build transaction-bound repositories. Keep the engine type behind the port.
-- **Do not assume transaction semantics exist everywhere:** a document or key-value store may not offer multi-document atomicity. State the guarantee the use case actually relies on.
+1. Begin with the appropriate request context/isolation settings.
+2. Construct every supplied repository/capability using that **same transaction**.
+3. Invoke the callback with those capabilities. Inside it, use the supplied stores, not pool-backed repositories injected elsewhere.
+4. Roll back/clean up on failure and preserve the original failure meaning.
+5. Check commit explicitly; never turn a commit failure into success or wrap an unrelated nil error.
+6. Return success only after commit. A local rollback does not reverse a remote effect.
 
-```go
-// The application layer sees a port, never a transaction handle.
-type TxManager interface {
-    Transact(ctx context.Context, fn func(ctx context.Context) error) error
-}
-```
+A context-only callback does not prove binding. Do not pass engine handles into the core or hide them in context as a service locator. Avoid a generic repository registry; add only named capabilities the atomic use case requires.
 
-**Checklist (transactions)**
+Prefer context-local transactions. A shared local transaction across contexts needs an explicit ownership/coupling decision; no local transaction makes remote calls atomic.
 
-- [ ] No engine transaction type appears in application or domain code.
-- [ ] The atomicity guarantee of each write is explicit.
-- [ ] Multi-repository transactions use a narrow provider port, not a shared engine handle.
-- [ ] Storage engines without transactional guarantees are not given SQL semantics by assumption.
+## Callbacks, events, and retries
 
-Persistence technology is selected per context and is not prescribed by DDD: no database, ORM, migration tool, connection pool, or query generator is mandatory, and an in-memory fake does not prove production storage semantics.
+Check whether the selected engine/provider can repeat the callback. Keep external calls, broker publication, and other non-repeatable effects out of retryable callbacks. Define identity/time/input stability and idempotency when repetition is possible. Bound attempts, honor cancellation, and use appropriate backoff; no unbounded deadlock loop.
 
-## Mapping and the persistence representation
+For durable integration facts, persist state and the outbox/message record with one supported atomic guarantee. Snapshot pending events instead of destructively clearing them before fallible persistence. Acknowledge after commit, or reconstruct a failed aggregate before reuse. A relay and idempotent consumers provide a deliberate at-least-once design, not a blanket exactly-once promise. See [domain lifecycle](domain-model.md) and [context integration](context-integration.md).
 
-The persistence shape is a separate type that lives inside the adapter, never a struct tag or an annotation on the domain type. The mapping functions are the only place where both shapes meet — the Go equivalent of a persistence assembler.
+## Integration evidence required
 
-```go
-// internal/[context-name]/infrastructure/persistence/postgres/course_repository.go
-package postgres
+Under `/test/integration/[context-name]/persistence/`, exercise the actual selected engine and production-relevant migrations/constraints. Verify mapping/reconstitution, absence/error translation, uniqueness, conditional writes, concurrent updates, rollback, cancellation, commit failures where feasible, and state/message atomicity when applicable.
 
-// courseRow is the persistence representation. It stays inside the adapter:
-// no struct tags, no ORM annotations, no domain invariants.
-type courseRow struct {
-	ID      string
-	Name    string
-	Version int
-}
-
-func toDomain(r courseRow) (*domain.Course, error) {
-	id, err := domain.NewCourseID(r.ID)
-	if err != nil {
-		return nil, fmt.Errorf("map course row: %w", err)
-	}
-	return domain.NewCourse(id, r.Name, r.Version)
-}
-
-func toRow(c *domain.Course) courseRow {
-	return courseRow{ID: c.ID().Value(), Name: c.Name(), Version: c.Version()}
-}
-
-// Save uses optimistic concurrency: the version column is compared on write.
-func (r *PostgresCourseRepository) Save(ctx context.Context, c *domain.Course) error {
-	res, err := r.db.ExecContext(ctx, updateCourseSQL,
-		toRow(c).Name, toRow(c).Version, toRow(c).ID)
-	if err != nil {
-		return fmt.Errorf("save course %s: %w", c.ID(), err)
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("save course %s: %w", c.ID(), domain.ErrCourseConflict)
-	}
-	return nil
-}
-```
-
-**Checklist (repositories and adapters)**
-
-- [ ] Each port is declared by its consumer and sized to what that consumer needs.
-- [ ] Implementations live in the owning context's `infrastructure/persistence/[technology]/`.
-- [ ] No persistence technology leaks through domain types or ports.
-- [ ] The persistence representation is a separate type inside the adapter, and the mapping functions are explicit.
-- [ ] Aggregate consistency, absence, and concurrency semantics are documented.
-- [ ] Persistence adapters have real integration/contract tests for the selected engine.
-- [ ] No repository is placed in `shared/` just because contexts use the same database.
+A memory fake, another database, a mutex, a callback signature, or passing unit mocks does not prove these guarantees. Report unexecuted or infeasible checks explicitly; do not silently skip missing infrastructure and call the adapter verified.

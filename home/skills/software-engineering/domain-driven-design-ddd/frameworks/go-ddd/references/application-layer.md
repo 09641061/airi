@@ -1,86 +1,47 @@
-# Application Layer
+# Application Layer — One Use Case at a Time
 
-The application layer exposes and orchestrates use cases. It depends on domain behavior and contracts; it does not import Gin, concrete persistence adapters, engine transaction handles, or transport DTOs.
+Source: guide §§3–4, 8, 16. Location: `internal/[context-name]/application/` or a cohesive feature package. Application coordinates domain behavior and consumed capabilities; it does not import Gin, transport DTOs, concrete adapters, or engine transaction handles.
 
-## Commands
+## Define the use-case contract
 
-Location: `[context-name]/application/commands/`
+Record intent, input, result, owning context, authorization/preconditions, errors, and required consistency. A plain Go input struct is sufficient. Keep the command/query, result, narrow port, and handler together in a file such as `confirm_enrollment.go` when they form one responsibility.
 
-A Command expresses an application intention to change state; it is not a persistence model and not a domain object.
+Do not impose commands/results/commandservices/queryservices packages. Preserve useful existing divisions. Introduce `application/confirmation/` only when feature cohesion and a meaningful API justify a package, not to reduce line count. A parent facade and its feature packages must not import each other cyclically.
 
-- Use a business-intent name such as `[action]_[entity]_command.go`, exported as `[Action][Entity]Command`.
-- Carry only the intent, identifiers, and operation constraints needed by the use case.
-- Validate structural input at the entry boundary. Domain behavior must still enforce business rules.
-- Do not add Gin, REST DTO, query-client, ORM, or driver-specific fields.
-- If a project already keeps command contracts in another package, keep that location as long as they remain application inputs.
+Inbound use-case interfaces are useful as consumed boundaries or published module APIs. A concrete handler is enough for a single internal implementation without a real abstraction need. Do not add a pass-through facade merely because a layer diagram contains one.
 
-**Checklist**
+## Implement a command
 
-- [ ] Command names communicate a business intention.
-- [ ] No HTTP or persistence-specific fields are introduced accidentally.
-- [ ] Required input data is present and documented.
-- [ ] Domain rules are rechecked by domain behavior; input validation is not mistaken for business validation.
+1. Accept request context explicitly, normally first, and propagate it to downstream I/O.
+2. Check use-case preconditions: authorization, required records, idempotency, and workflow readiness. A conditional here is not automatically domain leakage.
+3. Load the aggregate through the narrow consumer-owned port, or use the transaction-bound capabilities supplied by a justified provider.
+4. Invoke domain methods; do not duplicate their invariants in orchestration.
+5. Persist according to the declared concurrency/atomicity contract.
+6. Return the required identifier/result only when the operation's completion guarantee is satisfied. Transaction-local results remain provisional until commit.
+7. Coordinate external effects according to explicit failure/retry semantics, never as unsafe work inside a retryable storage callback.
 
-## Queries
+Application decides **what must agree atomically**; infrastructure decides how the engine provides it. Do not hide transaction handles in context or assume unrelated repositories are bound together. See [persistence](persistence.md).
 
-Location: `[context-name]/application/queries/`
+A simple CRUD command may use a focused store port without a rich aggregate. Do not invent entities, events, or invariants just to make every operation follow the same route.
 
-A Query requests information without modifying business state.
+## Implement a query
 
-- Use a name such as `[intent]_query.go`, exported as `[Intent]Query`.
-- Keep contracts focused on an information use case.
-- Make optional criteria and absence semantics explicit.
-- Validate filtering, sorting, pagination, and field constraints; bound page sizes and define deterministic ordering.
-- Return a focused application read projection when rebuilding an aggregate is unnecessary. Keep read DTOs/projections out of `domain/`.
-- Queries must not mutate aggregates or business state.
+- Express a focused information request and explicit result/absence contract.
+- Return a projection owned by application when no domain behavior is required; do not rebuild an aggregate merely to serialize a list.
+- Validate filtering/sorting/pagination and enforce bounded sizes and deterministic order.
+- Do not mutate business state as a read side effect.
+- Use a consumed read port rather than concrete queries, ORM types, or sqlc-generated interfaces in application.
 
-**Checklist**
+CQS separates intentions conceptually. Separate read models/stores, deployment, decorators, or a bus require actual complexity/load benefits; no automatic CQRS scaffold.
 
-- [ ] Query contracts are use-case-focused.
-- [ ] Pagination limits are bounded and deterministic.
-- [ ] Optional criteria and absence semantics are explicit.
-- [ ] Read operations do not mutate aggregates or state.
+## Ownership and integration
 
-## Command Services
+Publish only the intentionally supported application contract. A consumer uses its own capability port and adapts the provider outside the consuming core. Do not return foreign private aggregates or share repositories because both contexts use one database. See [context integration](context-integration.md).
 
-Location: `[context-name]/application/commandservices/`
+Error categories belong to the package owning their meaning; wrap with `%w` when preserving a cause is part of the contract. Neither application nor domain selects HTTP statuses. See [errors](errors.md).
 
-A Command Service coordinates a state-changing use case: obtain the needed aggregate, invoke domain behavior, persist the result, and coordinate side effects only when justified.
+## Verification
 
-- Accept `context.Context` as the first parameter and use constructor-injected ports.
-- Invoke domain methods for business rules; do not move invariants into orchestration.
-- Preserve business meaning in returned errors — wrap with `%w` and never rebuild the message by string concatenation.
-- Use a transaction/unit-of-work abstraction only if the operation and selected storage engine require it. Do not assume relational transaction semantics across technologies.
-- Make all-or-nothing guarantees, concurrency behavior, and retries explicit when the use-case contract needs them.
-- Do not accept `*gin.Context` or concrete storage/client types.
-- Wire implementations at the composition root.
+Use real domain objects with small contract-faithful fakes/stubs at external boundaries. Assert business-visible results, stored state, rejection without forbidden effects, and required coordination. A fake cannot prove SQL isolation, rollback, or actual commit behavior; verify those in `/test/integration`.
 
-**Checklist**
-
-- [ ] Depends on domain repository interfaces.
-- [ ] Calls real domain methods to enforce rules.
-- [ ] Errors preserve business meaning.
-- [ ] State-changing orchestration follows documented consistency guarantees.
-- [ ] Constructor wiring happens at the composition root.
-
-## Query Services
-
-Location: `[context-name]/application/queryservices/`
-
-- Execute read-only use cases with explicit absence and error semantics.
-- Use a domain repository if returning aggregates is appropriate; define a separate read port if a projection better serves the query.
-- Avoid generic all-purpose data-access services and direct database-implementation dependencies.
-- Accept `context.Context`; use bounded pagination and stable sorting.
-
-**Checklist**
-
-- [ ] Reads are side-effect free.
-- [ ] Read ports and models match actual use cases.
-- [ ] No direct dependency on a specific database implementation.
-- [ ] Sorting and pagination contracts are stable.
-
-## Checklists
-
-**Context and errors:** `context.Context` is the first parameter of any function that performs I/O, is never stored in a struct, and is never `nil`; business failures are sentinel or typed errors matched with `errors.Is`/`errors.As`.
-
-**Application:** command and query contracts express use-case intent, not transport or storage representation; orchestration depends on domain contracts and calls real domain behavior; reads are side-effect-free; writes state their consistency/concurrency guarantees; constructor wiring stays outside domain and application packages.
+Before delivery, verify consumer-owned interfaces, propagation of cancellation, bounded reads, explicit command consistency, and composition-root wiring. Preserve published routes/payloads/statuses and schema during architectural moves; separate approved behavior changes.

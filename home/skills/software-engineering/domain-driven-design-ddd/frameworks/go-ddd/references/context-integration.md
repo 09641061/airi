@@ -1,38 +1,48 @@
-# Bounded-Context Integration and ACL
+# Context Integration — Contracts, ACLs, and Delivery
 
-A bounded context owns its model and data. Integrate through explicitly published contracts; do not import another context's private domain types or access its tables, collections, or repositories directly.
+Source: guide §12, with event lifecycle in §6. A context owns its meaning and data. A shared database/client never authorizes cross-context repository, table, or private-model access.
 
-## Anti-Corruption Layer
+## Decide whether translation is needed
 
-An ACL translates a provider's public concepts into the consumer's own language. It is not a global sharing mechanism.
+1. Name provider and consumer, the capability/fact required, and its owner.
+2. Compare identifiers, terminology, states, absence/errors, and consistency expectations. Similar names do not prove identical meaning.
+3. Define the consumer-owned capability port and required types without exposing provider private aggregates.
+4. Publish only the intentionally supported provider application API. An in-process API can be an inbound port; it is not an HTTP endpoint.
+5. Add a facade/ACL only if stable adaptation or semantic protection is required; avoid pass-through layers.
+6. Inject the consumer's adapter at composition and test the agreed translations and failure behavior.
 
-1. Identify the consumer's needed operations and facts.
-2. Compare the contexts' meanings, identifiers, states, and error contracts.
-3. Define a narrow consumer-facing contract using consumer-owned types; do not expose provider aggregates by default.
-4. Publish an intentionally public provider facade in the provider's own application package (`[context-b]/application/`), not inside an HTTP/transport layer — an in-process contract is not an inbound interface. Do not publish repository implementation details.
-5. Implement the facade by delegating to provider application services and translating to the published contract.
-6. Create consumer-owned value objects for external identifiers/concepts only where needed; enforce consumer invariants.
-7. Implement the consumer ACL in the consumer's own boundary — a small `acl` package under `[context-a]/application/` when it only translates in-process results, or under `[context-a]/infrastructure/` when it performs I/O. Translate provider results, errors, and absent values into the consumer's error model. Never use `0` as a not-found sentinel.
-8. Inject a consumer-owned port into the consuming use case. Preserve failure semantics and make consistency expectations explicit.
+## Place by direction, not by the label ACL
 
-Distinguish missing data, business rejection, timeout/cancellation, and infrastructure failure. Avoid cyclic dependencies. Test provider contract compatibility, translations, missing-data cases, timeouts, and cross-context failure behavior.
+| Responsibility | Placement |
+|---|---|
+| Port the use case consumes | Consumer's application package, or a domain policy that genuinely consumes it |
+| Adapter importing/calling another context's public API, even in-process | Consumer's `infrastructure/acl/` or provider-named integration package |
+| Pure conversion using only application-owned contracts | Owning application feature |
+| Inbound adaptation from an external calling model to this context's application API | `interfaces/acl/` when actual translation/protection justifies it |
+| Published use-case contract | Provider's intentionally public application boundary |
 
-**Checklist**
+An inbound facade is not automatically a DDD ACL; document which models it translates and who owns it. Do not place an outbound provider call in application merely because it avoids network I/O, or force every translation into `interfaces/acl/`.
 
-- [ ] No direct imports of another context's internal models or repositories.
-- [ ] Provider exposes only an intentionally public contract.
-- [ ] Consumer owns the translation into its language.
-- [ ] Missing data, business rejection, timeout, and infrastructure error are distinguishable.
-- [ ] Cyclic dependencies are avoided; separate shared meaning goes into a Shared Kernel **only by explicit agreement**.
-- [ ] Cross-context failure and consistency scenarios are tested.
+Enforce imports through published APIs and avoid cycles. Top-level `internal/` does not isolate siblings. Never fix cycles by moving unrelated business contracts into shared. Translate provider outcomes into consumer meaning, distinguishing absence/rejection, timeouts/cancellation, and technical failure as required.
 
-## Shared Kernel versus shared infrastructure
+## Shared meaning versus technical reuse
 
-- A **Shared Kernel** is a small subset of domain meaning/invariants formally and intentionally co-owned by contexts. It is optional, requires an explicit context-mapping decision, and needs joint governance. Prefer `internal/shared/kernel/` if one exists.
-- `internal/shared/infrastructure/` is technical reuse only, such as shared configuration loading, telemetry setup, middleware, or a client factory. It contains no business rules and is not a Shared Kernel.
-- A shared client does not grant other contexts access to a repository or the owner's data. Keep context-specific adapters under their owning context.
-- Do not create `shared/domain/` or a shared package just because types have similar names; models may differ legitimately between contexts.
+A Shared Kernel requires explicitly co-owned domain concepts/invariants, joint change governance, and compatibility tests. A focused `internal/shared/kernel/` can express that deliberate decision, but is not required. Do not create it simply because two contexts have `UserID`, Money, or similarly named states.
 
-## Events and delivery
+Technical shared packages such as observability, HTTP middleware, or client factories require compatible actual consumers and ownership; they contain no business repositories or generic model DTOs. Process configuration may stay with bootstrap. See [architecture](architecture-and-structure.md).
 
-A Domain Event is a fact inside one context; it is not automatically an Integration Event. Cross-context communication happens through explicitly published contracts. When a fact must survive process failure, an outbox record written in the same transaction plus a retrying relay provides at-least-once delivery, and consumers must be idempotent. That mechanism is optional: add it only when durable delivery is a real requirement and the selected storage engine supports its semantics.
+## Events and failure coordination
+
+Domain facts are not automatically public integration contracts. Translate and version only the facts another context actually needs. For durable delivery, persist the integration record atomically with the state using the engine's supported mechanism, then relay with explicit retries and idempotent/deduplicating consumption.
+
+Audit crash windows, event identity, duplicate delivery, idempotency reservation/response persistence, and poison-message handling. Do not clear pending domain facts before a fallible commit or invoke non-repeatable remote effects inside retryable storage callbacks. Neither outbox nor an idempotency header alone provides exactly-once effects.
+
+Prefer context-local transactions. A deliberate shared local transaction is a coupling decision, not proof of distributed atomicity. If remote work can succeed before a local failure, specify recovery/coordination instead of pretending rollback undoes it.
+
+## Verify
+
+- Unit-test semantic conversion with real consumer types and boundary fakes.
+- Under `/test/integration/[context-name]/acl/` or `events/`, verify real provider/broker contracts where required, including failures, timeout, and duplicates.
+- Put genuine multi-context critical journeys under `/test/e2e/journeys/`.
+- Verify imports do not bypass the published API or leak provider repositories/private types.
+- Report unverified guarantees explicitly, not as completed integration merely because in-process calls compile.

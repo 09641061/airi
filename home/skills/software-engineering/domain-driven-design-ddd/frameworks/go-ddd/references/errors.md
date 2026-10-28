@@ -1,39 +1,35 @@
-# Error Model
+# Errors — Meaning Across Boundaries
 
-Go models failure as a value that travels up the call stack. Business meaning survives only if the error is modeled deliberately.
+Source: guide §9, with port ownership in §7 and HTTP translation in §11. An error is a contract, not a message string to compare or expose.
 
-- **Sentinel errors** for a closed set of business outcomes: `var ErrEnrollmentClosed = errors.New("enrollment is closed")`. They live in the package that owns the concept.
-- **Typed errors** when the caller needs structured data from the failure (`type ValidationError struct{ Field string; Reason string }` with an `Error() string` method).
-- **Wrapping** adds context while preserving the cause: `fmt.Errorf("enroll student %s: %w", studentID, err)`.
-- **Matching** uses `errors.Is(err, ErrEnrollmentClosed)` and `errors.As(err, &validationErr)` — never string comparison and never `err == someError` on a wrapped value.
-- **Absence** is a nil value plus an explicit sentinel (`ErrCourseNotFound`), never a zero value, an empty string, or a negative number.
-- **Translation** happens once, at the HTTP boundary, where `errors.Is` decides the status code; internal messages never reach the client.
+## Establish categories and ownership
 
-```go
-// internal/[context-name]/domain/course.go
-package courses
+| Meaning | Owner | Handling |
+|---|---|---|
+| Aggregate/policy rejection | Owning domain package | Sentinel for a closed outcome; typed error when structured data is needed |
+| Lookup absence / persistence conflict | Consumed port contract, often application | Adapter translates driver-specific outcomes into the declared contract |
+| Provider model or failure | Consumer-owned integration boundary | Translate to the consumer's meaning without leaking provider internals |
+| HTTP response | `interfaces/rest/` | Match known categories to documented status and safe public payload |
+| Unexpected technical failure | Relevant technical boundary, observable at request/process level | Preserve useful context and avoid leaking credentials/internal details |
 
-import "errors"
+Do not define PostgreSQL repository methods inside the domain merely because an error is being illustrated. Definitions, driver translation, and HTTP mapping are separate files/packages. Consult the guide's examples in those separate locations.
 
-var ErrCourseNotFound = errors.New("course not found")
+## Specify absence deliberately
 
-// The adapter wraps the driver error and keeps the cause reachable.
-func (r *PostgresCourseRepository) FindByID(ctx context.Context, id domain.CourseID) (*domain.Course, error) {
-	row, err := r.db.QueryRowContext(ctx, findCourseSQL, string(id)).Scan(...)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("find course %s: %w", id, domain.ErrCourseNotFound)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("find course %s: %w", id, err)
-	}
-	return domain.NewCourse(...)
-}
-```
+- Singular lookups default to an explicit not-found error in this project.
+- A genuinely optional lookup may instead promise a presence flag or `(nil, nil)` consistently; audit every caller before changing that contract.
+- `(T{}, err)` is idiomatic and is not an ambiguous magic failure value when the caller checks the error.
+- Empty collections normally represent successful reads; they do not imply missing infrastructure or a failed query.
+- Distinguish absence, conflict, domain rejection, cancellation/timeout, and unexpected failure where callers need different behavior.
 
-## Checklist
+## Preserve or translate meaning explicitly
 
-- [ ] Business failures are sentinel or typed errors, not formatted strings compared by text.
-- [ ] Wrapped errors keep the cause reachable through `errors.Is`/`errors.As`.
-- [ ] Absence and business rejection are distinguishable.
-- [ ] Adapters translate storage-driver errors into the port's contract.
-- [ ] HTTP status selection happens at the transport boundary, and internal details are not leaked.
+Use `errors.Is` for sentinel categories and `errors.As` for typed errors; no message matching or direct equality on wrapped values. Use `%w` when preserving a cause is part of the contract. Do not wrap nil or accidentally return nil when an operation such as commit failed.
+
+Translate at **each real boundary**, not only once globally: driver to port, provider to consumer, use case to HTTP. Only HTTP chooses statuses. Do not expose `err.Error()` as a public response; preserve published error schemas and report unexpected failures safely through observability.
+
+Keep request context explicit through I/O, normally as the first parameter. Respect standard/framework signatures, adapting from `c.Request.Context()` at HTTP entry. Do not store context in business structs, pass nil, or replace a request context with an unrelated background context. Pure calculations do not need context by default.
+
+## Verification
+
+Test wrapped-category matching, typed fields, absence alternatives, conflict differentiation, cancellation propagation, safe HTTP output, and unexpected-error handling. Verify that repository tests cover actual driver translation and that unit tests use the same contract in fakes. Keep API error changes separate from architectural moves.

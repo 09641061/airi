@@ -13,15 +13,15 @@ For the language-agnostic modeling rules behind this skill — subdomains, bound
 
 ## Core rules
 
-1. Completely avoid creating DTO classes.
-2. Completely avoid mapper classes.
-3. Appropriately documented responses in Swagger/OpenAPI must be consumed as contract in frontend.
+1. Completely avoid creating DTO classes (use TypeScript types/interfaces).
+2. Completely avoid mapper classes (use OpenAPI contracts directly; transform via pure functions only when UI shape differs significantly).
+3. Appropriately documented responses in Swagger/OpenAPI must be consumed as contracts in frontend.
 4. Do not use fake API in runtime flow; consume real API endpoints.
 5. Components and providers are **standalone** by default (no `NgModule`).
 6. Use the `inject()` function for dependency injection instead of constructor parameter injection — in services, guards, resolvers, and components alike.
 7. Use the built-in control flow syntax (`@if`, `@for`, `@switch`) in templates; do not use the legacy `*ngIf`/`*ngFor` structural directives.
-8. Prefer **Signals** for local/derived UI state (`signal`, `computed`, `effect`) over `BehaviorSubject`-based state; keep `Observable`s at the gateway/HTTP boundary and bridge with `toSignal`/`toObservable` when needed.
-9. Pin your Angular baseline explicitly and pick the matching zoneless API:
+8. Prefer **Signals** for state (`signal`, `computed`, `effect`, `input()`, `output()`); keep `Observable`s at the gateway/HTTP boundary and bridge with `toSignal`/`toObservable` or `firstValueFrom` when needed.
+9. Pin your Angular baseline explicitly and target zoneless change detection:
 
    | Version | Recommended API |
    | :--- | :--- |
@@ -30,6 +30,10 @@ For the language-agnostic modeling rules behind this skill — subdomains, bound
    | Angular 21+ (zoneless by default) | no provider required; verify `provideZoneChangeDetection` is not used |
 
    New bounded contexts should target zoneless; avoid `Zone.js`-implicit change detection in new code.
+10. **No backend-style Repositories:** In frontend, remote HTTP communication is modeled with **Infrastructure Gateways**; in-memory reactive state is modeled with **Application Stores/Services** using Signals.
+11. **Presentation layer split:** Routed orchestrators live in `presentation/pages/` (`*.page.ts`); reusable dumb components live in `presentation/components/` (`*.component.ts`).
+12. **Immutable Domain Models:** No class-based Java Beans with private fields and empty getters/setters. Domain entities, commands, and queries are immutable TypeScript types (`Readonly<T>`).
+13. **Asynchronous Safety:** Never navigate (`router.navigate()`) before async mutations resolve; manage `idle`, `loading`, `success`, and `error` states deterministically.
 
 ## Build order
 
@@ -37,18 +41,18 @@ Follow this order — load each reference only when you reach that step; don't f
 
 | # | Step | Reference |
 |---|------|-----------|
-| 1 | Value objects (IDs, validated primitives) | [references/value-objects.md](references/value-objects.md) |
+| 1 | Value objects (Branded types, validated primitives) | [references/value-objects.md](references/value-objects.md) |
 | 2 | Enums/union types | — (plain TS union types, no reference needed) |
-| 3 | Commands & Queries | [references/commands-and-queries.md](references/commands-and-queries.md) |
-| 4 | Domain services (interfaces) | [references/domain-services.md](references/domain-services.md) |
-| 5 | Entities/Aggregates | — (reuse shared frontend core folder for ID/audit fields when available) |
+| 3 | Commands & Queries (Immutable types) | [references/commands-and-queries.md](references/commands-and-queries.md) |
+| 4 | Domain services (Pure domain operations) | [references/domain-services.md](references/domain-services.md) |
+| 5 | Entities/Aggregates (Immutable models) | — (reuse shared frontend core folder for ID/audit fields when available) |
 | 6 | Domain events | [references/events.md](references/events.md) |
-| 7 | Infrastructure gateways (real API) | [references/infrastructure-gateways.md](references/infrastructure-gateways.md) |
-| 8 | Command/Query service implementations | [references/application-services.md](references/application-services.md) |
-| 9 | REST resources (frontend contracts) | [references/rest-resources.md](references/rest-resources.md) |
-| 10 | Frontend controllers/pages (orchestration) | [references/pages-and-orchestration.md](references/pages-and-orchestration.md) |
-| 11 | Components & forms | [references/components-and-forms.md](references/components-and-forms.md) |
-| 12 | Transformers, guards/interceptors/routes | — (functional `CanActivateFn`/`HttpInterceptorFn`, lazy `loadComponent`/`loadChildren`) |
+| 7 | Infrastructure gateways (Real API, no repositories) | [references/infrastructure-gateways.md](references/infrastructure-gateways.md) |
+| 8 | Application services & Signal stores | [references/application-services.md](references/application-services.md) |
+| 9 | Infrastructure contracts (OpenAPI types) | [references/rest-resources.md](references/rest-resources.md) |
+| 10 | Presentation pages (Smart routed orchestrators) | [references/pages-and-orchestration.md](references/pages-and-orchestration.md) |
+| 11 | Presentation components & forms | [references/components-and-forms.md](references/components-and-forms.md) |
+| 12 | Route configuration, guards & interceptors | — (functional `CanActivateFn`/`HttpInterceptorFn`, lazy `loadComponent`/`loadChildren`) |
 
 If the context needs to talk to another bounded context, add the **ACL layer** — see [references/acl-cross-context.md](references/acl-cross-context.md). Never let contexts call each other directly.
 

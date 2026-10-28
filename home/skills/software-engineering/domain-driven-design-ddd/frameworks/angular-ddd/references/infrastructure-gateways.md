@@ -1,19 +1,54 @@
 # Infrastructure Gateways
 
-Location: `[context-name]/infrastructure/api/gateways/`
+Location: `[context-name]/infrastructure/gateways/`
 
-Gateways encapsulate real HTTP communication with backend APIs.
+Gateways encapsulate HTTP communication with external backend APIs. They are the communication boundaries between the Angular application and the remote system.
 
-- **Interface + Implementation:** Define gateway contract and HTTP implementation.
-- **Naming Convention:** Contracts end with `Gateway`; implementations can end with `HttpGateway`.
-- **Angular Integration:** Implementations use `@Injectable` and `HttpClient`, injected via `inject(HttpClient)` rather than constructor parameters.
-- **Swagger/OpenAPI Driven:** Endpoints and payloads follow backend spec.
-- **Aggregate Focus:** One gateway per aggregate/use-case boundary.
-- **Signals at the Edge:** Gateways may expose read methods via `httpResource()`/`resource()` for simple GET-driven reads when a raw `Observable` isn't needed downstream; keep `Observable` returns for anything chained/combined with RxJS operators.
+- **Gateways, Not Repositories:** In frontend architecture, the remote backend is an external system, not an internal database. The Gateway pattern accurately models this boundary. Repositories (simulating in-memory collections of aggregates with `save()`/`delete()`) are an antipattern for frontend HTTP clients.
+- **Direct Injectable Services:** Gateways are concrete `@Injectable({ providedIn: 'root' })` services. Do not create separate interface + `HttpGatewayImpl` classes unless multi-backend polymorphism is strictly required.
+- **Angular Integration:** Injected via `inject(HttpClient)` rather than constructor parameters.
+- **Contract Driven:** Request and response payloads use typed contracts from `infrastructure/contracts/` aligned with Swagger/OpenAPI.
+- **Observables & Signals:** Gateways return `Observable<T>` for operations that require pipeline transformation or cancellation, or use `httpResource()` for declarative read resources.
+- **No In-Memory State:** Gateways are stateless; they do not hold or manage UI state.
 
-- [ ] Gateway contracts exist and are isolated
-- [ ] Implementations use `HttpClient` and real endpoints
-- [ ] Uses `@Injectable` with `inject()` for dependencies
-- [ ] Includes query methods needed by use cases
-- [ ] Follows naming conventions
-- [ ] One gateway per aggregate boundary
+```typescript
+// Example: [context-name]/infrastructure/gateways/courses.gateway.ts
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { CourseResource, CreateCourseRequest } from '../contracts/course.contract';
+import { environment } from '../../../../environments/environment';
+
+@Injectable({ providedIn: 'root' })
+export class CoursesGateway {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiBaseUrl}/courses`;
+
+  getAll(): Observable<CourseResource[]> {
+    return this.http.get<CourseResource[]>(this.baseUrl);
+  }
+
+  getById(id: number): Observable<CourseResource> {
+    return this.http.get<CourseResource>(`${this.baseUrl}/${id}`);
+  }
+
+  create(payload: CreateCourseRequest): Observable<CourseResource> {
+    return this.http.post<CourseResource>(this.baseUrl, payload);
+  }
+
+  update(id: number, payload: Partial<CreateCourseRequest>): Observable<CourseResource> {
+    return this.http.put<CourseResource>(`${this.baseUrl}/${id}`, payload);
+  }
+
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  }
+}
+```
+
+### Checklist
+- [ ] Named with `Gateway` suffix (e.g., `CoursesGateway`)
+- [ ] No repository abstractions; uses real endpoints and HTTP methods
+- [ ] Uses `@Injectable({ providedIn: 'root' })` and `inject()`
+- [ ] Consumes OpenAPI contracts from `infrastructure/contracts/`
+- [ ] Stateless: does not store collections or UI state internally

@@ -1,187 +1,160 @@
 # ACL Implementation (Cross-Context Communication)
 
-**Step 1: Identify Communication Needs**
+When a Bounded Context needs data or actions from another Bounded Context, they must communicate via an **Anti-Corruption Layer (ACL)**. Contexts must never import internal models, stores, or gateways from another context directly.
+
+## Step 1: Identify Communication Needs
 
 ```
-1. What data does Context A need from Context B?
-
+1. What data does Context A (Consumer) need from Context B (Provider)?
 2. What operations does Context A need to perform on Context B?
 ```
 
-**Step 2: Map Domain Models**
+## Step 2: Map Domain Models
 
 ```
-Context A (Consumer) Model <-> Context B (Provider) Model
+Context A (Consumer) Model <---> Context B (Provider) Model
 ```
 
-**Step 3: Define ACL Interface Contract**
+## Step 3: Define ACL Interface Contract
 
-```
-Questions to define:
+Keep it simple and focused strictly on consumer needs:
+- What methods does the facade expose?
+- What parameters are required?
+- What return types make sense?
 
-1. What methods will the facade expose?
-
-2. What parameters are needed?
-
-3. What return types make sense?
-
-4. How to handle errors?
-
-Design principle: Keep it simple and focused on consumer needs
-```
+---
 
 ## Implementation in Provider Context (Context B)
 
-**Step 4: Create ACL Facade Interface**
+### Step 4: Create ACL Facade Contract and Injection Token
 
-```ts
-// File: [context-b]/interfaces/acl/[context-b]-context-facade.ts
+Interfaces are erased at runtime in TypeScript and cannot serve as Angular DI tokens directly. Define an `InjectionToken` for the contract:
 
+```typescript
+// File: [context-b]/acl/[context-b]-context-facade.ts
 export interface ContextBContextFacade {
   createEntity(param1: string, param2: string): Promise<number>;
-  findEntityIdByField(identifier: string): Promise<number>;
+  findEntityIdByField(identifier: string): Promise<number | null>;
 }
 ```
 
-> Interfaces are erased at runtime. They cannot be used as Angular DI tokens
-> directly. Expose them through an `InjectionToken` bound by a composition
-> or root module.
-
-```ts
-// File: [context-b]/interfaces/acl/[context-b]-context-facade.token.ts
-
+```typescript
+// File: [context-b]/acl/[context-b]-context-facade.token.ts
 import { InjectionToken } from '@angular/core';
 import { ContextBContextFacade } from './[context-b]-context-facade';
 
 export const CONTEXT_B_CONTEXT_FACADE = new InjectionToken<ContextBContextFacade>(
-  'ContextBContextFacade',
+  'ContextBContextFacade'
 );
 ```
 
-**Step 5: Implement ACL Facade**
+### Step 5: Implement ACL Facade
 
-```ts
-// File: [context-b]/application/acl/[context-b]-context-facade.impl.ts
-
+```typescript
+// File: [context-b]/acl/[context-b]-context-facade.impl.ts
 import { Injectable, inject, EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { ContextBContextFacade } from '../../interfaces/acl/[context-b]-context-facade';
-import { CONTEXT_B_CONTEXT_FACADE } from '../../interfaces/acl/[context-b]-context-facade.token';
-import { EntityCommandService } from '../internal/commandservices/entity-command-service';
-import { EntityQueryService } from '../internal/queryservices/entity-query-service';
+import { ContextBContextFacade } from './[context-b]-context-facade';
+import { CONTEXT_B_CONTEXT_FACADE } from './[context-b]-context-facade.token';
+import { EntityStore } from '../application/entity.store';
 
 @Injectable({ providedIn: 'root' })
 export class ContextBContextFacadeImpl implements ContextBContextFacade {
-  private readonly entityCommandService = inject(EntityCommandService);
-  private readonly entityQueryService = inject(EntityQueryService);
+  private readonly entityStore = inject(EntityStore);
 
   async createEntity(param1: string, param2: string): Promise<number> {
-    const entity = await this.entityCommandService.handle({ param1, param2 });
-    return entity ? entity.id : 0;
+    const created = await this.entityStore.addEntity({ param1, param2 });
+    return created ? created.id : 0;
   }
 
-  async findEntityIdByField(identifier: string): Promise<number> {
-    const entity = await this.entityQueryService.handle({ identifier });
-    return entity ? entity.id : 0;
+  async findEntityIdByField(identifier: string): Promise<number | null> {
+    const entity = await this.entityStore.findByIdentifier(identifier);
+    return entity ? entity.id : null;
   }
 }
 
-/**
- * Bind the token to the implementation so that `inject(CONTEXT_B_CONTEXT_FACADE)`
- * in any consumer resolves to ContextBContextFacadeImpl. Call this once in
- * the root bootstrap providers (or the composition module of context-b).
- */
-export function provideContextBContextFacade(): EnvironmentProviders {
+export function provideContextBFacade(): EnvironmentProviders {
   return makeEnvironmentProviders([
-    { provide: CONTEXT_B_CONTEXT_FACADE, useExisting: ContextBContextFacadeImpl },
+    { provide: CONTEXT_B_CONTEXT_FACADE, useExisting: ContextBContextFacadeImpl }
   ]);
 }
 ```
 
+---
+
 ## Implementation in Consumer Context (Context A)
 
-**Step 6: Create Value Objects in Consumer Context**
+### Step 6: Define Value Objects in Consumer Context
 
-```ts
-// File: [context-a]/domain/model/valueobjects/entity-id.value-object.ts
+Use branded types or pure parsers so Context A does not leak Context B's raw types:
 
-export type EntityId = Readonly<{ value: number }>;
+```typescript
+// File: [context-a]/domain/model/valueobjects/external-entity-id.value-object.ts
+export type ExternalEntityId = number & { readonly __brand: unique symbol };
 
-export const createEntityId = (entityId: number): EntityId => {
-  if (!Number.isInteger(entityId) || entityId <= 0) {
-    throw new Error('Entity ID must be a positive number');
+export const parseExternalEntityId = (value: number): ExternalEntityId => {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error('External entity ID must be a positive integer');
   }
-  return Object.freeze({ value: entityId });
+  return value as ExternalEntityId;
 };
 ```
 
-**Step 7: Create External Service (ACL Layer)**
+### Step 7: Create Outbound Adapter (ACL Layer in Context A)
 
-```ts
-// File: [context-a]/application/internal/outboundservices/acl/external-entity.service.ts
-
+```typescript
+// File: [context-a]/application/acl/external-entity.adapter.ts
 import { Injectable, inject } from '@angular/core';
-// Five-level ascent: internal/outboundservices/acl -> internal/outboundservices
-//   -> internal -> application -> [context-a], then DOWN to the sibling context-b.
-// Package aliases (for example '@acme/context-b/...') are preferred in real projects.
-import { CONTEXT_B_CONTEXT_FACADE } from '../../../../../context-b/interfaces/acl/context-b-context-facade.token';
-import { EntityId, createEntityId } from '../../../../domain/model/valueobjects/entity-id.value-object';
+import { CONTEXT_B_CONTEXT_FACADE } from '../../../../context-b/acl/[context-b]-context-facade.token';
+import { ExternalEntityId, parseExternalEntityId } from '../../domain/model/valueobjects/external-entity-id.value-object';
 
 @Injectable({ providedIn: 'root' })
-export class ExternalEntityService {
-  private readonly contextBContextFacade = inject(CONTEXT_B_CONTEXT_FACADE);
+export class ExternalEntityAdapter {
+  private readonly facade = inject(CONTEXT_B_CONTEXT_FACADE);
 
-  async fetchEntityByField(field: string): Promise<EntityId | null> {
-    const entityId = await this.contextBContextFacade.findEntityIdByField(field);
-    return entityId === 0 ? null : createEntityId(entityId);
+  async fetchEntityId(field: string): Promise<ExternalEntityId | null> {
+    const rawId = await this.facade.findEntityIdByField(field);
+    return rawId ? parseExternalEntityId(rawId) : null;
   }
 
-  async createEntity(param1: string, param2: string): Promise<EntityId | null> {
-    const entityId = await this.contextBContextFacade.createEntity(param1, param2);
-    return entityId === 0 ? null : createEntityId(entityId);
+  async createEntity(param1: string, param2: string): Promise<ExternalEntityId> {
+    const rawId = await this.facade.createEntity(param1, param2);
+    if (!rawId) throw new Error('External context failed to create entity');
+    return parseExternalEntityId(rawId);
   }
 }
 ```
 
-## Phase 4: Integration in Consumer Context
+### Step 8: Use in Consumer Application Service / Store
 
-**Step 8: Update Command Services**
+```typescript
+// File: [context-a]/application/consumer-entity.store.ts
+import { Injectable, inject } from '@angular/core';
+import { ConsumerEntityGateway } from '../infrastructure/gateways/consumer-entity.gateway';
+import { ExternalEntityAdapter } from './acl/external-entity.adapter';
+import { CreateConsumerEntityCommand } from '../domain/model/commands/create-consumer-entity.command';
 
-```ts
-// File: [context-a]/application/internal/commandservices/[consumer-entity]-command-service.impl.ts
+@Injectable({ providedIn: 'root' })
+export class ConsumerEntityStore {
+  private readonly gateway = inject(ConsumerEntityGateway);
+  private readonly externalAdapter = inject(ExternalEntityAdapter);
 
-export class ConsumerEntityCommandServiceImpl {
-  private readonly repository = inject(ConsumerEntityRepository);
-  private readonly externalEntityService = inject(ExternalEntityService);
-
-  async handle(command: CreateConsumerEntityCommand): Promise<ConsumerEntityId> {
-    // Step 1: Try to fetch existing entity from external context
-    let entityId = await this.externalEntityService.fetchEntityByField(command.field);
-
-    // Step 2: If not found, create in external context
-    if (!entityId) {
-      entityId = await this.externalEntityService.createEntity(command.param1, command.param2);
-    } else {
-      // Step 3: Validate no duplicate exists in current context
-      const existing = await this.repository.findByEntityId(entityId);
-      if (existing) throw new Error('Duplicate entity found');
+  async handleCreate(command: CreateConsumerEntityCommand): Promise<void> {
+    // 1. Resolve or create dependency in external context via ACL
+    let externalId = await this.externalAdapter.fetchEntityId(command.field);
+    if (!externalId) {
+      externalId = await this.externalAdapter.createEntity(command.param1, command.param2);
     }
 
-    // Step 4: Ensure external operation succeeded
-    if (!entityId) throw new Error('Unable to create/fetch external entity');
-
-    // Step 5: Create consumer entity with external reference
-    const consumerEntity = ConsumerEntity.create(entityId);
-    await this.repository.save(consumerEntity);
-    return consumerEntity.id;
+    // 2. Persist local entity via gateway with reference to externalId
+    await this.gateway.create({ ...command, externalId });
   }
 }
 ```
 
-**Common Pitfalls to Avoid:**
+---
 
-1. **Don't expose complex domain objects** - Use simple types in ACL interfaces.
-2. **Don't create circular dependencies** - Context A -> Context B, not both ways.
-3. **Don't skip error handling** - Always handle external context failures.
-4. **Don't forget testing** - Test ACL integration thoroughly.
-5. **Don't tight-couple** - Always go through ACL interfaces/facades, never direct calls.
-6. **Don't mix DI styles** - Once a bounded context adopts `inject()`, don't reintroduce constructor-parameter injection; keep it consistent across services, guards, and interceptors.
+## Pitfalls to Avoid
+1. **Never import internals cross-context:** Never import models, stores, or gateways from another bounded context directly. Always pass through the ACL Facade.
+2. **No Repositories:** Use gateways and stores; do not inject simulated database repositories.
+3. **Circular Dependencies:** Context A $\to$ Context B, never bidirectional.
+4. **Error Isolation:** Handle external context failures gracefully inside the adapter.

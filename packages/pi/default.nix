@@ -1,7 +1,7 @@
 { pkgs }:
 let
-  version = "1.4.0"; # nix-update: version
-  hash = "sha256-8uTkMpYDIj0DJgzbi9UDPb3B9zuliriTnbLlZUbhFdI="; # nix-update: hash
+  version = "1.5.0"; # nix-update: version
+  hash = "sha256-34cLoONEy3szWNjY8ZOXuLjSJahml4RzataKXCFp1Ts="; # nix-update: hash
 in
 pkgs.stdenv.mkDerivation {
   pname = "pi-coding-agent";

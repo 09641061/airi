@@ -5,7 +5,7 @@ let
   # Official Cursor Agent CLI tarball (same as https://cursor.com/install uses)
   src = pkgs.fetchurl {
     url = "https://downloads.cursor.com/lab/${version}/linux/x64/agent-cli-package.tar.gz";
-    hash = "sha256-PLACEHOLDER="; # nix-update: hash
+    hash = "sha256-Fwt3eGy/TJMGTWT/8StxoXi5aHMFYcZK/C6OdSU1RC4="; # nix-update: hash
   };
 in
 pkgs.stdenv.mkDerivation {

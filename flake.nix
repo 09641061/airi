@@ -20,7 +20,7 @@
       antigravity-cli = import ./packages/agy { inherit pkgs; };
       pi-coding-agent = import ./packages/pi { inherit pkgs; };
       herdr = import ./packages/herdr { inherit pkgs; };
-      cursor = import ./packages/cursor { inherit pkgs; };
+
 
       mkUpdateApp = name: {
         type = "app";
@@ -52,7 +52,6 @@
           antigravity-cli
           pi-coding-agent
           herdr
-          cursor
           ;
 
         # Install all tools at once if you want.
@@ -64,7 +63,6 @@
             antigravity-cli
             pi-coding-agent
             herdr
-            cursor
           ];
         };
       };
@@ -88,7 +86,6 @@
         update-pi-coding-agent = mkUpdateApp "pi-coding-agent";
         update-herdr = mkUpdateApp "herdr";
         update-antigravity-cli = mkUpdateApp "antigravity-cli";
-        update-cursor = mkUpdateApp "cursor";
       };
     };
 }

@@ -3,8 +3,6 @@ let
   piVersion = config.programs.pi.coding-agent.package.version;
 in
 {
-  home.sessionVariables.PI_XAI_CLIENT_VERSION = "1.0.13";
-
   programs.pi.coding-agent.settings.packages = [
     # Async subagents need the unbundled runtime alongside the standalone CLI.
     "npm:@earendil-works/pi-coding-agent@${piVersion}"

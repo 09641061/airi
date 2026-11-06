@@ -20,6 +20,7 @@
       antigravity-cli = import ./packages/agy { inherit pkgs; };
       pi-coding-agent = import ./packages/pi { inherit pkgs; };
       herdr = import ./packages/herdr { inherit pkgs; };
+      cursor = import ./packages/cursor { inherit pkgs; inherit (pkgs) lib; };
 
       mkUpdateApp = name: {
         type = "app";
@@ -30,13 +31,17 @@
               echo "Error: Run this update script from the airi repository root." >&2
               exit 1
             fi
-            exec bash "$script_dir/${
-              if name == "claude-code" then "claude/update-claude-code.sh"
-              else if name == "codex" then "codex/update-codex.sh"
-              else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
-              else if name == "herdr" then "herdr/update-herdr.sh"
-              else "agy/update-antigravity-cli.sh"
-            }" "$@"
+            if [ "${name}" = "cursor" ]; then
+              exec node "$script_dir/cursor/update.js" "$@"
+            else
+              exec bash "$script_dir/${
+                if name == "claude-code" then "claude/update-claude-code.sh"
+                else if name == "codex" then "codex/update-codex.sh"
+                else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
+                else if name == "herdr" then "herdr/update-herdr.sh"
+                else "agy/update-antigravity-cli.sh"
+              }" "$@"
+            fi
           ''
         );
       };
@@ -50,6 +55,7 @@
           antigravity-cli
           pi-coding-agent
           herdr
+          cursor
           ;
 
         # Install all tools at once if you want.
@@ -61,6 +67,7 @@
             antigravity-cli
             pi-coding-agent
             herdr
+            cursor
           ];
         };
       };
@@ -83,6 +90,7 @@
         update-pi-coding-agent = mkUpdateApp "pi-coding-agent";
         update-herdr = mkUpdateApp "herdr";
         update-antigravity-cli = mkUpdateApp "antigravity-cli";
+        update-cursor = mkUpdateApp "cursor";
       };
     };
 }

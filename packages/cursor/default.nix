@@ -1,68 +1,39 @@
-{
-  pkgs,
-  lib,
-  ...
-}:
+{ pkgs }:
 
 let
-  pname = "cursor";
-  release = lib.importJSON ./sources.json;
-  inherit (release) version;
-
-  sourceInfo = release.sources.${pkgs.stdenv.hostPlatform.system} or (throw "cursor: unsupported platform ${pkgs.stdenv.hostPlatform.system}");
-  source = pkgs.fetchurl sourceInfo;
-
-  appimageContents = pkgs.appimageTools.extractType2 {
-    inherit version pname;
-    src = source;
-  };
-
-  wrappedAppimage = pkgs.appimageTools.wrapType2 {
-    inherit version pname;
-    src = source;
-    extraPkgs = pkgs: with pkgs; [
-      libsecret
-      libnotify
-      xdg-utils
-      mesa
-      vulkan-loader
-    ];
+  version = "2026.11.05-86047df"; # nix-update: version
+  # Official Cursor Agent CLI tarball (same as https://cursor.com/install uses)
+  src = pkgs.fetchurl {
+    url = "https://downloads.cursor.com/lab/${version}/linux/x64/agent-cli-package.tar.gz";
+    hash = "sha256-PLACEHOLDER="; # nix-update: hash
   };
 in
-pkgs.stdenvNoCC.mkDerivation {
-  inherit pname version;
-  src = wrappedAppimage;
+pkgs.stdenv.mkDerivation {
+  pname = "cursor-cli";
+  inherit version;
 
-  nativeBuildInputs = [ pkgs.makeWrapper ];
+  inherit src;
+  dontUnpack = true;
 
   installPhase = ''
     runHook preInstall
-
-    mkdir -p $out/bin $out/share/cursor $out/share/applications $out/share/icons
-
-    cp -r bin $out/bin
-
-    cp -a ${appimageContents}/usr/share/cursor/locales $out/share/cursor/
-    cp -a ${appimageContents}/usr/share/cursor/resources $out/share/cursor/
-    cp -a ${appimageContents}/usr/share/icons $out/share/
-
-    install -Dm 644 ${appimageContents}/cursor.desktop -t $out/share/applications/
-
-    substituteInPlace $out/share/applications/cursor.desktop \
-      --replace-quiet "Icon=co.anysphere.cursor" "Icon=cursor"
-
-    wrapProgram $out/bin/cursor \
-      --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}} --no-update"
-
+    mkdir -p $out/bin
+    tar -xzf $src -C $out/bin
+    # The tarball usually contains a binary called "cursor" or "agent"
+    if [ -f $out/bin/cursor ]; then
+      chmod +x $out/bin/cursor
+    elif [ -f $out/bin/agent ]; then
+      mv $out/bin/agent $out/bin/cursor
+      chmod +x $out/bin/cursor
+    fi
     runHook postInstall
   '';
 
-  meta = with lib; {
-    description = "AI-powered code editor built on VS Code";
+  meta = with pkgs.lib; {
+    description = "Cursor Agent CLI (official)";
     homepage = "https://cursor.com";
     license = licenses.unfree;
-    sourceProvenance = [ sourceTypes.binaryNativeCode ];
-    platforms = builtins.attrNames release.sources;
+    platforms = [ "x86_64-linux" ];
     mainProgram = "cursor";
   };
 }

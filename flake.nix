@@ -20,7 +20,7 @@
       antigravity-cli = import ./packages/agy { inherit pkgs; };
       pi-coding-agent = import ./packages/pi { inherit pkgs; };
       herdr = import ./packages/herdr { inherit pkgs; };
-      cursor = import ./packages/cursor { inherit pkgs; inherit (pkgs) lib; };
+      cursor = import ./packages/cursor { inherit pkgs; };
 
       mkUpdateApp = name: {
         type = "app";
@@ -31,17 +31,14 @@
               echo "Error: Run this update script from the airi repository root." >&2
               exit 1
             fi
-            if [ "${name}" = "cursor" ]; then
-              exec node "$script_dir/cursor/update.js" "$@"
-            else
-              exec bash "$script_dir/${
-                if name == "claude-code" then "claude/update-claude-code.sh"
-                else if name == "codex" then "codex/update-codex.sh"
-                else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
-                else if name == "herdr" then "herdr/update-herdr.sh"
-                else "agy/update-antigravity-cli.sh"
-              }" "$@"
-            fi
+            exec bash "$script_dir/${
+              if name == "claude-code" then "claude/update-claude-code.sh"
+              else if name == "codex" then "codex/update-codex.sh"
+              else if name == "pi-coding-agent" then "pi/update-pi-coding-agent.sh"
+              else if name == "herdr" then "herdr/update-herdr.sh"
+              else if name == "cursor" then "cursor/update-cursor.sh"
+              else "agy/update-antigravity-cli.sh"
+            }" "$@"
           ''
         );
       };
@@ -84,6 +81,7 @@
       #   nix run .#update-pi-coding-agent
       #   nix run .#update-herdr
       #   nix run .#update-antigravity-cli -- 1.1.14-6068529322131456
+#   nix run .#update-cursor   # manual (build-specific URLs)
       apps.${system} = {
         update-claude-code = mkUpdateApp "claude-code";
         update-codex = mkUpdateApp "codex";
